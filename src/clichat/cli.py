@@ -7,6 +7,7 @@ from typing import List, Optional
 from prompt_toolkit import PromptSession
 from rich.console import Console
 
+from clichat import __version__
 from clichat.config import Config, init_config_file, load_config
 from clichat.providers import create_provider
 from clichat.providers.base import BaseProvider
@@ -227,6 +228,7 @@ class CliApp:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="CLI Chat with Local & Cloud LLMs")
+    parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("prompt", nargs="*", help="Direct prompt or piped query (or 'init' to initialize config)")
     parser.add_argument("-p", "--provider", help="Specify provider (e.g. ollama, openrouter, omlx, nvidia, gemini)")
     parser.add_argument("-m", "--model", help="Specify model name")

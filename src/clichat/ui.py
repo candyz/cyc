@@ -17,6 +17,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.theme import Theme
 
+from clichat import __version__
+
 custom_theme = Theme({
     "info": "dim cyan",
     "warning": "yellow",
@@ -88,7 +90,7 @@ class TerminalUI:
 
     def print_banner(self, provider: str, model: str, multiline: bool = False):
         mode_text = "[magenta]Multi-line Mode[/magenta]" if multiline else "[dim]Single-line Mode[/dim]"
-        title = f"[bold green]clichat[/bold green] [dim]v0.1.0[/dim]"
+        title = f"[bold green]clichat[/bold green] [dim]v{__version__}[/dim]"
         body = (
             f"Provider: [bold cyan]{provider}[/bold cyan]  |  Model: [bold cyan]{model}[/bold cyan]  |  {mode_text}\n"
             f"[dim]Commands: /help, /models, /model <name>, /provider <name>, /multiline, /exit[/dim]"
