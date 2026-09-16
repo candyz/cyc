@@ -2,7 +2,8 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 import pytest
-from clichat.cli import parse_args, async_main
+from clichat.cli import parse_args, async_main, CliApp
+from clichat.config import load_config
 
 def test_parse_args_defaults():
     with patch.object(sys, "argv", ["clichat"]):
@@ -33,3 +34,42 @@ async def test_async_main_init_command(tmp_path: Path):
         assert target_config.exists()
         content = target_config.read_text(encoding="utf-8")
         assert "default_provider" in content
+
+@pytest.mark.asyncio
+async def test_openrouter_free_model_filtering():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="openrouter")
+
+    sample_models = [
+        "anthropic/claude-3.5-sonnet",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemini-2.0-flash-exp:free",
+        "openai/gpt-4o",
+        "deepseek/deepseek-r1:free",
+    ]
+    app.provider.list_models = AsyncMock(return_value=sample_models)
+
+    await app.update_cached_models()
+    assert app.cached_models == [
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "google/gemini-2.0-flash-exp:free",
+        "deepseek/deepseek-r1:free",
+    ]
+    assert app.get_known_models() == app.cached_models
+
+@pytest.mark.asyncio
+async def test_non_openrouter_keeps_all_models():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+
+    sample_models = [
+        "llama3.3:latest",
+        "qwen2.5:latest",
+    ]
+    app.provider.list_models = AsyncMock(return_value=sample_models)
+
+    await app.update_cached_models()
+    assert app.cached_models == [
+        "llama3.3:latest",
+        "qwen2.5:latest",
+    ]

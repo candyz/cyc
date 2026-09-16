@@ -36,7 +36,11 @@ class CliApp:
 
     async def update_cached_models(self) -> None:
         try:
-            self.cached_models = await self.provider.list_models()
+            models = await self.provider.list_models()
+            if self.provider_name.lower() == "openrouter":
+                self.cached_models = [m for m in models if m.lower().endswith("free")]
+            else:
+                self.cached_models = models
         except Exception:
             self.cached_models = []
 
@@ -99,11 +103,24 @@ class CliApp:
             return True
         elif action == "/models":
             console.print("[dim]Fetching models...[/dim]")
-            await self.update_cached_models()
-            if self.cached_models:
-                self.ui.print_models_table(self.cached_models, self.model, self.provider_name)
-            else:
-                console.print(f"[yellow]No models found or listing not supported by provider '{self.provider_name}'.[/yellow]")
+            try:
+                raw_models = await self.provider.list_models()
+                if self.provider_name.lower() == "openrouter":
+                    show_all = arg.lower() in ("--all", "-a", "all")
+                    display_models = raw_models if show_all else [m for m in raw_models if m.lower().endswith("free")]
+                    self.cached_models = [m for m in raw_models if m.lower().endswith("free")]
+                else:
+                    display_models = raw_models
+                    self.cached_models = raw_models
+
+                if display_models:
+                    self.ui.print_models_table(display_models, self.model, self.provider_name)
+                    if self.provider_name.lower() == "openrouter" and not arg.lower() in ("--all", "-a", "all"):
+                        console.print("[dim]Tip: Filtered to free models (*free). Use '/models --all' to show all models.[/dim]")
+                else:
+                    console.print(f"[yellow]No models found or listing not supported by provider '{self.provider_name}'.[/yellow]")
+            except Exception as e:
+                console.print(f"[bold red]Failed to fetch models:[/bold red] {e}")
             return True
         elif action == "/model":
             if not arg:
