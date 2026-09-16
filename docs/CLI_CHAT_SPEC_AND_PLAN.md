@@ -42,7 +42,7 @@ flowchart TD
     Dispatcher <--> GeminiEngine[Gemini 專用適配器\nGoogle GenAI Adapter]
     
     OpenAIEngine <--> Ollama[本地: Ollama :11434]
-    OpenAIEngine <--> OMLX[本地: OMLX/MLX :8080]
+    OpenAIEngine <--> OMLX[本地: OMLX/MLX :8000]
     OpenAIEngine <--> OpenRouter[雲端: OpenRouter]
     OpenAIEngine <--> NVIDIA[雲端: NVIDIA NIM]
     GeminiEngine <--> GeminiAPI[雲端: Google Gemini API]
@@ -81,7 +81,7 @@ providers:
 
   omlx:
     type: openai_compatible
-    base_url: "http://localhost:8080/v1"
+    base_url: "http://localhost:8000/v1"
     api_key: "empty"
     default_model: "default"
 

@@ -61,7 +61,7 @@ DEFAULT_CONFIG_DICT = {
         },
         "omlx": {
             "type": "openai_compatible",
-            "base_url": "http://localhost:8080/v1",
+            "base_url": "http://localhost:8000/v1",
             "api_key": "omlx",
             "default_model": "default",
         },
@@ -114,7 +114,7 @@ providers:
   # 2. Local OMLX / Apple Silicon MLX Server
   omlx:
     type: openai_compatible
-    base_url: "http://localhost:8080/v1"
+    base_url: "http://localhost:8000/v1"
     api_key: "omlx"
     default_model: "default"
 
