@@ -1,0 +1,154 @@
+import os
+import re
+from pathlib import Path
+from typing import Any, Dict, Optional
+import yaml
+from pydantic import BaseModel, Field
+
+ENV_VAR_PATTERN = re.compile(r"\$\{(\w+)\}|\$(\w+)")
+
+def expand_env_vars(data: Any) -> Any:
+    """Recursively expand environment variables like ${VAR} or $VAR."""
+    if isinstance(data, str):
+        def replace(match: re.Match) -> str:
+            var_name = match.group(1) or match.group(2)
+            return os.environ.get(var_name, "")
+        return ENV_VAR_PATTERN.sub(replace, data)
+    elif isinstance(data, dict):
+        return {k: expand_env_vars(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [expand_env_vars(item) for item in data]
+    return data
+
+class ProviderConfig(BaseModel):
+    type: str = "openai_compatible"
+    base_url: str = ""
+    api_key: str = "placeholder"
+    default_model: str = ""
+
+class UIConfig(BaseModel):
+    theme: str = "monokai"
+    stream: bool = True
+    markdown_render: bool = True
+
+class Config(BaseModel):
+    default_provider: str = "ollama"
+    default_model: str = ""
+    providers: Dict[str, ProviderConfig] = Field(default_factory=dict)
+    ui: UIConfig = Field(default_factory=UIConfig)
+
+    def get_provider(self, name: Optional[str] = None) -> ProviderConfig:
+        provider_name = name or self.default_provider
+        if provider_name not in self.providers:
+            raise KeyError(f"Provider '{provider_name}' not configured in providers list: {list(self.providers.keys())}")
+        return self.providers[provider_name]
+
+DEFAULT_CONFIG_DICT = {
+    "default_provider": "ollama",
+    "default_model": "",
+    "providers": {
+        "ollama": {
+            "type": "openai_compatible",
+            "base_url": "http://localhost:11434/v1",
+            "api_key": "ollama",
+            "default_model": "llama3.3:latest",
+        },
+        "openrouter": {
+            "type": "openai_compatible",
+            "base_url": "https://openrouter.ai/api/v1",
+            "api_key": "${OPENROUTER_API_KEY}",
+            "default_model": "anthropic/claude-3.5-sonnet",
+        },
+        "omlx": {
+            "type": "openai_compatible",
+            "base_url": "http://localhost:8080/v1",
+            "api_key": "omlx",
+            "default_model": "default",
+        },
+        "nvidia": {
+            "type": "openai_compatible",
+            "base_url": "https://integrate.api.nvidia.com/v1",
+            "api_key": "${NVIDIA_API_KEY}",
+            "default_model": "meta/llama-3.3-70b-instruct",
+        },
+        "gemini": {
+            "type": "gemini",
+            "api_key": "${GEMINI_API_KEY}",
+            "default_model": "gemini-2.5-flash",
+        },
+    },
+    "ui": {
+        "theme": "monokai",
+        "stream": True,
+        "markdown_render": True,
+    }
+}
+
+DEFAULT_CONFIG_PATH = Path.home() / ".config" / "clichat" / "config.yaml"
+
+def load_config(config_path: Optional[Path] = None) -> Config:
+    path = config_path or DEFAULT_CONFIG_PATH
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            raw_data = yaml.safe_load(f) or {}
+    else:
+        raw_data = DEFAULT_CONFIG_DICT
+
+    expanded_data = expand_env_vars(raw_data)
+    return Config.model_validate(expanded_data)
+
+DEFAULT_CONFIG_TEMPLATE = """# clichat configuration file
+# Default provider and model to use on startup
+default_provider: ollama
+default_model: llama3.3:latest
+
+# Provider configurations
+providers:
+  # 1. Local Ollama (default port 11434)
+  ollama:
+    type: openai_compatible
+    base_url: "http://localhost:11434/v1"
+    api_key: "ollama"
+    default_model: "llama3.3:latest"
+
+  # 2. Local OMLX / Apple Silicon MLX Server
+  omlx:
+    type: openai_compatible
+    base_url: "http://localhost:8080/v1"
+    api_key: "omlx"
+    default_model: "default"
+
+  # 3. OpenRouter (Cloud Multi-provider Gateway)
+  openrouter:
+    type: openai_compatible
+    base_url: "https://openrouter.ai/api/v1"
+    api_key: "${OPENROUTER_API_KEY}"
+    default_model: "anthropic/claude-3.5-sonnet"
+
+  # 4. NVIDIA NIM
+  nvidia:
+    type: openai_compatible
+    base_url: "https://integrate.api.nvidia.com/v1"
+    api_key: "${NVIDIA_API_KEY}"
+    default_model: "meta/llama-3.3-70b-instruct"
+
+  # 5. Google Gemini (Native SDK)
+  gemini:
+    type: gemini
+    api_key: "${GEMINI_API_KEY}"
+    default_model: "gemini-2.5-flash"
+
+# Terminal UI configuration
+ui:
+  theme: "monokai"
+  stream: true
+  markdown_render: true
+"""
+
+def init_config_file(dest_path: Optional[Path] = None, force: bool = False) -> Path:
+    target = dest_path or DEFAULT_CONFIG_PATH
+    if target.exists() and not force:
+        raise FileExistsError(f"Config file already exists at: {target}. Use --force to overwrite.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(DEFAULT_CONFIG_TEMPLATE, encoding="utf-8")
+    return target
