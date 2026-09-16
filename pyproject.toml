@@ -3,7 +3,7 @@ name = "clichat"
 version = "0.1.0"
 description = "CLI chat tool for local (Ollama, OMLX) and cloud (Gemini, OpenRouter, NVIDIA) models"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "google-genai>=2.23.0",
     "openai>=3.14.1",
