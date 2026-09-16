@@ -76,6 +76,10 @@ DEFAULT_CONFIG_DICT = {
             "api_key": "${GEMINI_API_KEY}",
             "default_model": "gemini-2.5-flash",
         },
+        "agy": {
+            "type": "agy",
+            "default_model": "gemini-3.1-pro-high",
+        },
     },
     "ui": {
         "theme": "monokai",
@@ -90,7 +94,14 @@ def load_config(config_path: Optional[Path] = None) -> Config:
     path = config_path or DEFAULT_CONFIG_PATH
     if path.exists():
         with open(path, "r", encoding="utf-8") as f:
-            raw_data = yaml.safe_load(f) or {}
+            user_data = yaml.safe_load(f) or {}
+
+        # Merge defaults so newly introduced providers are automatically accessible
+        raw_data = dict(DEFAULT_CONFIG_DICT)
+        raw_data.update(user_data)
+        merged_providers = dict(DEFAULT_CONFIG_DICT["providers"])
+        merged_providers.update(user_data.get("providers", {}))
+        raw_data["providers"] = merged_providers
     else:
         raw_data = DEFAULT_CONFIG_DICT
 
@@ -137,6 +148,11 @@ providers:
     type: gemini
     api_key: "${GEMINI_API_KEY}"
     default_model: "gemini-2.5-flash"
+
+  # 6. Google Antigravity (Uses local agy CLI with Gemini AI Pro subscription quota, no API key needed)
+  agy:
+    type: agy
+    default_model: "gemini-3.1-pro-high"
 
 # Terminal UI configuration
 ui:
