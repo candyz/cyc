@@ -7,6 +7,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
+from prompt_toolkit.formatted_text import HTML, AnyFormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from rich.box import ROUNDED
@@ -179,6 +180,7 @@ def create_prompt_session(
     get_models: Optional[Callable[[], List[str]]] = None,
     get_providers: Optional[Callable[[], List[str]]] = None,
     multiline: bool = False,
+    bottom_toolbar: Optional[Callable[[], AnyFormattedText]] = None,
 ) -> PromptSession:
     """Create a configured prompt_toolkit PromptSession with history and keybindings."""
     if history_file:
@@ -205,4 +207,5 @@ def create_prompt_session(
         auto_suggest=AutoSuggestFromHistory(),
         key_bindings=kb,
         multiline=multiline,
+        bottom_toolbar=bottom_toolbar,
     )

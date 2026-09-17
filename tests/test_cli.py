@@ -101,3 +101,16 @@ async def test_handle_slash_command_mode_and_tools():
 
     handled = await app.handle_slash_command("/tools")
     assert handled is True
+
+
+def test_status_toolbar():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+    toolbar_html = app._get_status_toolbar()
+    assert "CHAT" in toolbar_html.value
+    assert "ollama" in toolbar_html.value
+    assert "Tokens:" in toolbar_html.value
+
+    app.mode = "agent"
+    toolbar_html_agent = app._get_status_toolbar()
+    assert "AGENT" in toolbar_html_agent.value

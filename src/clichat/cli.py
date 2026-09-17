@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
 from rich.console import Console
 
 from clichat import __version__
@@ -244,6 +245,25 @@ class CliApp:
             return True
         return False
 
+    def _get_status_toolbar(self) -> HTML:
+        """Generate status bar displayed at the bottom of the prompt."""
+        mode_badge = f"<b><style bg='ansimagenta' fg='ansiwhite'> AGENT </style></b>" if self.mode == "agent" else f"<b><style bg='ansicyan' fg='ansiwhite'> CHAT </style></b>"
+        ml_badge = "<style fg='ansimagenta'>[Multi-line: Esc+Enter]</style>" if self.multiline_mode else "<style fg='ansigray'>[Single-line]</style>"
+
+        tokens = self.session.total_estimated_tokens()
+        limit = self.session.max_context_tokens
+        token_str = f"{tokens}/{limit}"
+
+        status_text = (
+            f" {mode_badge} "
+            f"<b>Provider:</b> <style fg='ansigreen'>{self.provider_name}</style> | "
+            f"<b>Model:</b> <style fg='ansicyan'>{self.model}</style> | "
+            f"<b>Tokens:</b> <style fg='ansiyellow'>{token_str}</style> | "
+            f"{ml_badge} "
+            f"<style fg='ansigray'>(Type /help for commands)</style> "
+        )
+        return HTML(status_text)
+
     async def repl(self) -> None:
         self.ui.print_banner(self.provider_name, self.model, self.multiline_mode, mode=self.mode)
         # Prefetch model list for tab completion
@@ -255,6 +275,7 @@ class CliApp:
                 get_models=self.get_known_models,
                 get_providers=self.get_known_providers,
                 multiline=self.multiline_mode,
+                bottom_toolbar=self._get_status_toolbar,
             )
 
             prompt_label = "... > " if self.multiline_mode else f"[{self.mode}] you > "
