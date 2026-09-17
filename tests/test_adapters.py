@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import sqlite3
 import pytest
 
 from clichat.adapters import SessionAdapters
@@ -299,4 +300,204 @@ def test_export_and_sync_back_to_agy(tmp_path: Path):
     res2 = SessionAdapters.sync_session_back(imported)
     assert res2["success"] is True
     assert res2["synced_count"] == 0
+
+
+def test_export_and_sync_back_to_claude(tmp_path: Path):
+    projects_dir = tmp_path / "claude_projects"
+    proj_dir = projects_dir / "my-project"
+    proj_dir.mkdir(parents=True)
+    session_file = proj_dir / "claude-session-xyz.jsonl"
+
+    initial_records = [
+        {"type": "user", "message": {"role": "user", "content": "Initial question in Claude"}},
+        {"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "Initial answer from Claude"}]}},
+    ]
+    with open(session_file, "w", encoding="utf-8") as f:
+        for r in initial_records:
+            f.write(json.dumps(r) + "\n")
+
+    # 1. Import claude session
+    imported = SessionAdapters.import_claude_session("claude-session", projects_dir=projects_dir)
+    assert imported is not None
+    assert imported.external_metadata["source_agent"] == "claude"
+    assert imported.external_metadata["source_id"] == "claude-session-xyz"
+    assert imported.external_metadata["base_message_count"] == 2
+
+    # 2. Add new user and assistant message with tool call in clichat
+    imported.add_user_message("Please run tests")
+    imported.messages.append({
+        "role": "assistant",
+        "content": "Running test suite...",
+        "tool_calls": [{
+            "id": "tc_1",
+            "type": "function",
+            "function": {"name": "run_command", "arguments": json.dumps({"command": "pytest"})},
+        }],
+    })
+    imported.messages.append({
+        "role": "tool",
+        "tool_call_id": "tc_1",
+        "name": "run_command",
+        "content": "All tests passed",
+    })
+
+    # 3. Sync session back to Claude
+    result = SessionAdapters.sync_session_back(imported, custom_path=projects_dir)
+    assert result["success"] is True
+    assert result["synced_count"] == 3
+
+    # 4. Verify appended lines in claude session file
+    lines = [json.loads(line) for line in session_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(lines) == 5
+    assert lines[2]["type"] == "user"
+    assert lines[2]["message"]["content"] == "Please run tests"
+    assert lines[3]["type"] == "assistant"
+    assert lines[3]["message"]["content"][0]["type"] == "text"
+    assert lines[3]["message"]["content"][1]["type"] == "tool_use"
+    assert lines[3]["message"]["content"][1]["name"] == "run_command"
+    assert lines[4]["type"] == "user"
+    assert lines[4]["message"]["content"][0]["type"] == "tool_result"
+    assert lines[4]["message"]["content"][0]["content"] == "All tests passed"
+
+    # 5. Calling sync again is idempotent
+    res2 = SessionAdapters.sync_session_back(imported, custom_path=projects_dir)
+    assert res2["success"] is True
+    assert res2["synced_count"] == 0
+
+
+def test_export_and_sync_back_to_pi(tmp_path: Path):
+    sessions_dir = tmp_path / "pi_sessions"
+    proj_dir = sessions_dir / "my-project"
+    proj_dir.mkdir(parents=True)
+    session_file = proj_dir / "pi-session-abc.jsonl"
+
+    initial_records = [
+        {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "Hello Pi"}]}},
+        {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Hello from Pi"}]}},
+    ]
+    with open(session_file, "w", encoding="utf-8") as f:
+        for r in initial_records:
+            f.write(json.dumps(r) + "\n")
+
+    # 1. Import Pi session
+    imported = SessionAdapters.import_pi_session("pi-session", sessions_dir=sessions_dir)
+    assert imported is not None
+    assert imported.external_metadata["source_agent"] == "pi"
+    assert imported.external_metadata["source_id"] == "pi-session-abc"
+    assert imported.external_metadata["base_message_count"] == 2
+
+    # 2. Add new user & assistant message in clichat
+    imported.add_user_message("Check system status")
+    imported.messages.append({
+        "role": "assistant",
+        "content": "Status looks normal.",
+    })
+
+    # 3. Sync back to Pi
+    result = SessionAdapters.sync_session_back(imported, custom_path=sessions_dir)
+    assert result["success"] is True
+    assert result["synced_count"] == 2
+
+    # 4. Verify appended lines in Pi session file
+    lines = [json.loads(line) for line in session_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(lines) == 4
+    assert lines[2]["type"] == "message"
+    assert lines[2]["message"]["role"] == "user"
+    assert lines[2]["message"]["content"][0]["text"] == "Check system status"
+    assert lines[3]["type"] == "message"
+    assert lines[3]["message"]["role"] == "assistant"
+    assert lines[3]["message"]["content"][0]["text"] == "Status looks normal."
+
+    # 5. Idempotent check
+    res2 = SessionAdapters.sync_session_back(imported, custom_path=sessions_dir)
+    assert res2["success"] is True
+    assert res2["synced_count"] == 0
+
+
+def test_export_and_sync_back_to_opencode(tmp_path: Path):
+    db_file = tmp_path / "opencode.db"
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE session (
+        id text PRIMARY KEY,
+        project_id text,
+        title text,
+        directory text,
+        agent text,
+        model text,
+        time_created integer,
+        time_updated integer
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE message (
+        id text PRIMARY KEY,
+        session_id text,
+        time_created integer,
+        time_updated integer,
+        data text
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE part (
+        id text PRIMARY KEY,
+        message_id text,
+        session_id text,
+        time_created integer,
+        time_updated integer,
+        data text
+    );
+    """)
+
+    # Populate initial session
+    cursor.execute("""
+    INSERT INTO session (id, project_id, title, directory, agent, model, time_created, time_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    """, ("ses_oc_001", "proj_1", "Test Session", "/tmp", "build", json.dumps({"id": "model-x"}), 1000, 2000))
+    cursor.execute("INSERT INTO message VALUES ('msg_1', 'ses_oc_001', 1000, 1000, '{\"role\": \"user\"}');")
+    cursor.execute("INSERT INTO part VALUES ('part_1', 'msg_1', 'ses_oc_001', 1000, 1000, '{\"type\": \"text\", \"text\": \"Query in OpenCode\"}');")
+    cursor.execute("INSERT INTO message VALUES ('msg_2', 'ses_oc_001', 1010, 1010, '{\"role\": \"assistant\"}');")
+    cursor.execute("INSERT INTO part VALUES ('part_2', 'msg_2', 'ses_oc_001', 1010, 1010, '{\"type\": \"text\", \"text\": \"Response in OpenCode\"}');")
+    conn.commit()
+    conn.close()
+
+    # 1. Import opencode session
+    imported = SessionAdapters.import_opencode_session("ses_oc", db_path=db_file)
+    assert imported is not None
+    assert imported.external_metadata["source_agent"] == "opencode"
+    assert imported.external_metadata["source_id"] == "ses_oc_001"
+    assert imported.external_metadata["base_message_count"] == 2
+
+    # 2. Add new user and assistant message
+    imported.add_user_message("Analyze the performance")
+    imported.add_assistant_message("Performance is optimal")
+
+    # 3. Sync back to OpenCode
+    result = SessionAdapters.sync_session_back(imported, custom_path=db_file)
+    assert result["success"] is True
+    assert result["synced_count"] == 2
+
+    # 4. Verify SQLite rows
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    cursor.execute("SELECT count(*) FROM message WHERE session_id = 'ses_oc_001';")
+    msg_count = cursor.fetchone()[0]
+    assert msg_count == 4
+
+    cursor.execute("SELECT count(*) FROM part WHERE session_id = 'ses_oc_001';")
+    part_count = cursor.fetchone()[0]
+    assert part_count == 4
+
+    cursor.execute("SELECT data FROM part WHERE session_id = 'ses_oc_001' ORDER BY time_created ASC;")
+    all_parts = [json.loads(row[0]) for row in cursor.fetchall()]
+    assert all_parts[2]["text"] == "Analyze the performance"
+    assert all_parts[3]["text"] == "Performance is optimal"
+    conn.close()
+
+    # 5. Idempotent check
+    res2 = SessionAdapters.sync_session_back(imported, custom_path=db_file)
+    assert res2["success"] is True
+    assert res2["synced_count"] == 0
+
 

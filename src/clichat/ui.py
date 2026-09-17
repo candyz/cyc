@@ -111,7 +111,7 @@ class CommandCompleter(Completer):
             except Exception:
                 pass
         elif cmd == "/sync":
-            for opt in ("agy",):
+            for opt in ("agy", "claude", "pi", "opencode"):
                 if opt.startswith(arg_prefix.lower()):
                     yield Completion(opt, start_position=-len(arg_prefix))
         elif cmd == "/trust":

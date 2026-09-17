@@ -776,24 +776,406 @@ class SessionAdapters:
         }
 
     @classmethod
+    def export_session_to_claude(
+        cls,
+        session: SessionManager,
+        target_session_id: Optional[str] = None,
+        projects_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Write back newly generated messages in session to Claude Code project JSONL file."""
+        target_dir = projects_dir or CLAUDE_PROJECTS_DIR
+        sess_id = target_session_id
+        if not sess_id and session.external_metadata.get("source_agent") == "claude":
+            sess_id = session.external_metadata.get("source_id")
+
+        if not sess_id:
+            import uuid
+            sess_id = str(uuid.uuid4())
+
+        # Determine target file
+        target_file = None
+        if session.external_metadata.get("file_path") and Path(session.external_metadata["file_path"]).exists():
+            target_file = Path(session.external_metadata["file_path"])
+        else:
+            default_proj = target_dir / "default"
+            default_proj.mkdir(parents=True, exist_ok=True)
+            target_file = default_proj / f"{sess_id}.jsonl"
+
+        base_count = 0
+        if session.external_metadata.get("source_id") == sess_id:
+            base_count = session.external_metadata.get("base_message_count", 0)
+
+        new_messages = session.messages[base_count:]
+        if not new_messages:
+            return {
+                "success": True,
+                "synced_count": 0,
+                "session_id": sess_id,
+                "file_path": str(target_file),
+                "message": "Already up to date (no new messages to sync back).",
+            }
+
+        written_count = 0
+        with open(target_file, "a", encoding="utf-8") as f:
+            for msg in new_messages:
+                role = msg.get("role")
+                content = msg.get("content", "")
+
+                if role == "user":
+                    record = {
+                        "type": "user",
+                        "message": {"role": "user", "content": content},
+                    }
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    written_count += 1
+
+                elif role == "assistant":
+                    tool_calls_raw = msg.get("tool_calls", [])
+                    content_blocks = []
+                    if content:
+                        content_blocks.append({"type": "text", "text": content})
+                    for tc in tool_calls_raw:
+                        fn = tc.get("function", {})
+                        t_name = fn.get("name", "tool")
+                        args = fn.get("arguments", {})
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except Exception:
+                                pass
+                        content_blocks.append({
+                            "type": "tool_use",
+                            "id": tc.get("id", "call_0"),
+                            "name": t_name,
+                            "input": args,
+                        })
+
+                    record = {
+                        "type": "assistant",
+                        "message": {"role": "assistant", "content": content_blocks},
+                    }
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    written_count += 1
+
+                elif role == "tool":
+                    record = {
+                        "type": "user",
+                        "message": {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": msg.get("tool_call_id", "call_0"),
+                                    "content": str(content),
+                                }
+                            ],
+                        },
+                    }
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    written_count += 1
+
+        session.external_metadata["source_agent"] = "claude"
+        session.external_metadata["source_id"] = sess_id
+        session.external_metadata["file_path"] = str(target_file)
+        session.external_metadata["base_message_count"] = len(session.messages)
+        session.auto_save()
+
+        return {
+            "success": True,
+            "synced_count": written_count,
+            "session_id": sess_id,
+            "file_path": str(target_file),
+            "message": f"Successfully synced {written_count} turns back to Claude Code session '{sess_id}'",
+        }
+
+    @classmethod
+    def export_session_to_pi(
+        cls,
+        session: SessionManager,
+        target_session_id: Optional[str] = None,
+        sessions_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Write back newly generated messages in session to Pi Agent JSONL file."""
+        target_dir = sessions_dir or PI_SESSIONS_DIR
+        sess_id = target_session_id
+        if not sess_id and session.external_metadata.get("source_agent") == "pi":
+            sess_id = session.external_metadata.get("source_id")
+
+        if not sess_id:
+            import uuid
+            sess_id = str(uuid.uuid4())
+
+        target_file = None
+        if session.external_metadata.get("file_path") and Path(session.external_metadata["file_path"]).exists():
+            target_file = Path(session.external_metadata["file_path"])
+        else:
+            default_sub = target_dir / "default"
+            default_sub.mkdir(parents=True, exist_ok=True)
+            target_file = default_sub / f"{sess_id}.jsonl"
+
+        base_count = 0
+        if session.external_metadata.get("source_id") == sess_id:
+            base_count = session.external_metadata.get("base_message_count", 0)
+
+        new_messages = session.messages[base_count:]
+        if not new_messages:
+            return {
+                "success": True,
+                "synced_count": 0,
+                "session_id": sess_id,
+                "file_path": str(target_file),
+                "message": "Already up to date (no new messages to sync back).",
+            }
+
+        written_count = 0
+        with open(target_file, "a", encoding="utf-8") as f:
+            for msg in new_messages:
+                role = msg.get("role")
+                content = msg.get("content", "")
+
+                if role == "user":
+                    record = {
+                        "type": "message",
+                        "message": {
+                            "role": "user",
+                            "content": [{"type": "text", "text": content}],
+                        },
+                    }
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    written_count += 1
+
+                elif role == "assistant":
+                    tool_calls_raw = msg.get("tool_calls", [])
+                    content_list = []
+                    if content:
+                        content_list.append({"type": "text", "text": content})
+                    for tc in tool_calls_raw:
+                        fn = tc.get("function", {})
+                        t_name = fn.get("name", "tool")
+                        args = fn.get("arguments", {})
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except Exception:
+                                pass
+                        content_list.append({
+                            "type": "toolCall",
+                            "id": tc.get("id", "call_0"),
+                            "name": t_name,
+                            "arguments": args,
+                        })
+
+                    record = {
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": content_list,
+                        },
+                    }
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    written_count += 1
+
+                elif role == "tool":
+                    record = {
+                        "type": "message",
+                        "message": {
+                            "role": "toolResult",
+                            "toolCallId": msg.get("tool_call_id", "call_0"),
+                            "toolName": msg.get("name", "tool"),
+                            "content": [{"type": "text", "text": str(content)}],
+                        },
+                    }
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    written_count += 1
+
+        session.external_metadata["source_agent"] = "pi"
+        session.external_metadata["source_id"] = sess_id
+        session.external_metadata["file_path"] = str(target_file)
+        session.external_metadata["base_message_count"] = len(session.messages)
+        session.auto_save()
+
+        return {
+            "success": True,
+            "synced_count": written_count,
+            "session_id": sess_id,
+            "file_path": str(target_file),
+            "message": f"Successfully synced {written_count} turns back to Pi Agent session '{sess_id}'",
+        }
+
+    @classmethod
+    def export_session_to_opencode(
+        cls,
+        session: SessionManager,
+        target_session_id: Optional[str] = None,
+        db_path: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Write back newly generated messages in session to OpenCode SQLite database."""
+        target_db = db_path or OPENCODE_DB_PATH
+        if not target_db.exists():
+            return {
+                "success": False,
+                "error": f"OpenCode database not found at {target_db}",
+            }
+
+        sess_id = target_session_id
+        if not sess_id and session.external_metadata.get("source_agent") == "opencode":
+            sess_id = session.external_metadata.get("source_id")
+
+        if not sess_id:
+            import uuid
+            sess_id = f"ses_{uuid.uuid4().hex[:16]}"
+
+        base_count = 0
+        if session.external_metadata.get("source_id") == sess_id:
+            base_count = session.external_metadata.get("base_message_count", 0)
+
+        new_messages = session.messages[base_count:]
+        if not new_messages:
+            return {
+                "success": True,
+                "synced_count": 0,
+                "session_id": sess_id,
+                "file_path": str(target_db),
+                "message": "Already up to date (no new messages to sync back).",
+            }
+
+        import time
+        import uuid
+
+        written_count = 0
+        try:
+            conn = sqlite3.connect(str(target_db))
+            cursor = conn.cursor()
+
+            # Ensure session exists in session table
+            cursor.execute("SELECT id FROM session WHERE id = ?;", (sess_id,))
+            if not cursor.fetchone():
+                now_ms = int(time.time() * 1000)
+                cursor.execute("""
+                INSERT INTO session (id, time_created, time_updated, model)
+                VALUES (?, ?, ?, ?);
+                """, (sess_id, now_ms, now_ms, session.model or "default"))
+
+            now_ms = int(time.time() * 1000)
+            for msg in new_messages:
+                role = msg.get("role")
+                content = msg.get("content", "")
+                msg_id = f"msg_{uuid.uuid4().hex[:16]}"
+
+                if role == "user":
+                    cursor.execute("""
+                    INSERT INTO message (id, session_id, time_created, time_updated, data)
+                    VALUES (?, ?, ?, ?, ?);
+                    """, (msg_id, sess_id, now_ms, now_ms, json.dumps({"role": "user"})))
+
+                    part_id = f"part_{uuid.uuid4().hex[:16]}"
+                    cursor.execute("""
+                    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+                    VALUES (?, ?, ?, ?, ?, ?);
+                    """, (part_id, msg_id, sess_id, now_ms, now_ms, json.dumps({"type": "text", "text": content})))
+                    written_count += 1
+                    now_ms += 10
+
+                elif role == "assistant":
+                    tool_calls_raw = msg.get("tool_calls", [])
+                    cursor.execute("""
+                    INSERT INTO message (id, session_id, time_created, time_updated, data)
+                    VALUES (?, ?, ?, ?, ?);
+                    """, (msg_id, sess_id, now_ms, now_ms, json.dumps({"role": "assistant"})))
+
+                    if content:
+                        part_id = f"part_{uuid.uuid4().hex[:16]}"
+                        cursor.execute("""
+                        INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+                        VALUES (?, ?, ?, ?, ?, ?);
+                        """, (part_id, msg_id, sess_id, now_ms, now_ms, json.dumps({"type": "text", "text": content})))
+
+                    for tc in tool_calls_raw:
+                        fn = tc.get("function", {})
+                        t_name = fn.get("name", "tool")
+                        args = fn.get("arguments", {})
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except Exception:
+                                pass
+                        part_id = f"part_{uuid.uuid4().hex[:16]}"
+                        cursor.execute("""
+                        INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+                        VALUES (?, ?, ?, ?, ?, ?);
+                        """, (part_id, msg_id, sess_id, now_ms, now_ms, json.dumps({
+                            "type": "tool",
+                            "tool": t_name,
+                            "callID": tc.get("id", "call_0"),
+                            "state": {"input": args},
+                        })))
+                    written_count += 1
+                    now_ms += 10
+
+                elif role == "tool":
+                    # Tool observation in opencode part
+                    part_id = f"part_{uuid.uuid4().hex[:16]}"
+                    cursor.execute("""
+                    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+                    VALUES (?, ?, ?, ?, ?, ?);
+                    """, (part_id, msg_id, sess_id, now_ms, now_ms, json.dumps({
+                        "type": "tool",
+                        "tool": msg.get("name", "tool"),
+                        "callID": msg.get("tool_call_id", "call_0"),
+                        "state": {"output": str(content)},
+                    })))
+                    written_count += 1
+                    now_ms += 10
+
+            # Update session time_updated
+            cursor.execute("UPDATE session SET time_updated = ? WHERE id = ?;", (now_ms, sess_id))
+            conn.commit()
+            conn.close()
+
+            session.external_metadata["source_agent"] = "opencode"
+            session.external_metadata["source_id"] = sess_id
+            session.external_metadata["file_path"] = str(target_db)
+            session.external_metadata["base_message_count"] = len(session.messages)
+            session.auto_save()
+
+            return {
+                "success": True,
+                "synced_count": written_count,
+                "session_id": sess_id,
+                "file_path": str(target_db),
+                "message": f"Successfully synced {written_count} turns back to OpenCode session '{sess_id}'",
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Failed to write to OpenCode SQLite database: {e}",
+            }
+
+    @classmethod
     def sync_session_back(
         cls,
         session: SessionManager,
         target_agent: Optional[str] = None,
-        brain_dir: Optional[Path] = None,
+        custom_path: Optional[Path] = None,
     ) -> Dict[str, Any]:
         """Automatically detect or target external agent and write new conversation turns back."""
         agent = (target_agent or session.external_metadata.get("source_agent") or "").lower()
         if agent in ("agy", "antigravity"):
-            return cls.export_session_to_agy(session, brain_dir=brain_dir)
+            return cls.export_session_to_agy(session, brain_dir=custom_path)
+        elif agent in ("claude", "claude_code"):
+            return cls.export_session_to_claude(session, projects_dir=custom_path)
+        elif agent in ("pi", "pi_agent"):
+            return cls.export_session_to_pi(session, sessions_dir=custom_path)
+        elif agent in ("opencode", "zen"):
+            return cls.export_session_to_opencode(session, db_path=custom_path)
         elif not agent:
             return {
                 "success": False,
-                "error": "No source agent detected in session. Use '/sync agy' to specify target.",
+                "error": "No source agent detected in session. Specify target agent (e.g. '/sync agy', '/sync claude', '/sync pi', '/sync opencode').",
             }
         else:
             return {
                 "success": False,
-                "error": f"Two-way bridge currently supports 'agy' (Google Antigravity). '{agent}' is not supported yet.",
+                "error": f"Unsupported agent '{agent}'. Supported: agy, claude, pi, opencode.",
             }
 

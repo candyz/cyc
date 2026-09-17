@@ -120,6 +120,18 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 - 每次對話皆會產生追加寫入（Append-only）的 `.events.jsonl` 日誌，完整記錄系統決策、模型輸入與工具觀察結果。
 - 輸入 `/fork <id>`：可隨時將現有對話與工具執行歷程分岔至全新會話分支，進行不同方向的實作嘗試。
 
+### 4.5 雙向寫回橋接器 (Two-Way Bridge / `/sync`)
+`clichat` 不僅能讀取與接續各大外部 AI 編程代理的歷史對話，更能將在 `clichat` 產生的新對話回合、思考過程與工具呼叫**無縫增量寫回**外部代理原生儲存結構中，實現雙向任意切換：
+- **Google Antigravity (`agy`)**：寫回 `~/.gemini/antigravity-cli/brain/<uuid>/.system_generated/logs/transcript.jsonl`。
+- **Claude Code (`claude`)**：寫回 `~/.claude/projects/<slug>/<session>.jsonl`。
+- **Pi Agent (`pi`)**：寫回 `~/.pi/agent/sessions/*/<session>.jsonl`。
+- **OpenCode (`opencode`)**：寫回 SQLite 資料庫 `~/.local/share/opencode/opencode.db`（自動處理 `session`, `message`, `part` 關聯與微秒級時間戳）。
+- **指令用法**：
+  ```bash
+  /sync              # 自動識別原始代理來源並增量寫回
+  /sync claude       # 明確指定寫回為 Claude Code 會話
+  ```
+
 ---
 
 ## 5. 安全與信任機制 (Security & Trust)
@@ -151,7 +163,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `/sessions <source>` | 列出所有已儲存會話（支援 `all`, `clichat`, `agy`, `claude`, `pi`, `opencode`） |
 | `/resume <id>` | 接續現有會話或跨工具匯入歷史對話 |
 | `/fork <id>` | 將目前會話分岔出獨立分支並立即切換 |
-| `/sync <agent>` | 雙向寫回外部代理（例如 `/sync agy`，使原工具亦可接續對話） |
+| `/sync [agent]` | 雙向寫回外部代理（支援 `agy`, `claude`, `pi`, `opencode`，自動或手動指定，原工具可接續開發） |
 | `/models` | 表格化列出當前 Provider 所有可用模型清單 |
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
