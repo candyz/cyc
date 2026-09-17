@@ -22,11 +22,31 @@ def estimate_tokens(text: str) -> int:
             other_chars += 1
     return cjk_count + max(1, (other_chars + 3) // 4)
 
+def get_default_context_limit(provider: Optional[str] = None, model: Optional[str] = None) -> int:
+    """Determine a modern, realistic token limit based on provider and model defaults.
+    Prevents aggressive premature context window pruning.
+    """
+    prov = (provider or "").lower()
+    mod = (model or "").lower()
+
+    if "gemma" in mod or "nemotron" in mod:
+        return 32_768
+    elif "gemini" in prov or "gemini" in mod or "agy" in prov:
+        return 1_000_000
+    elif "claude" in mod or "anthropic" in mod:
+        return 200_000
+    elif "deepseek" in mod or "gpt-4" in mod or "gpt-3.5" in mod or "nvidia" in prov:
+        return 128_000
+    elif "qwen" in mod or "llama-3" in mod or "llama3" in mod:
+        return 128_000
+    # Modern general default (128k)
+    return 128_000
+
 class SessionManager:
     def __init__(
         self,
         system_prompt: Optional[str] = None,
-        max_context_tokens: int = 8192,
+        max_context_tokens: Optional[int] = None,
         session_id: Optional[str] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
@@ -34,11 +54,14 @@ class SessionManager:
         sessions_dir: Optional[Path] = None,
     ):
         self.system_prompt = system_prompt
-        self.max_context_tokens = max_context_tokens
-        self.session_id = session_id or f"session_{int(time.time())}"
         self.provider = provider
         self.model = model
         self.mode = mode
+        if max_context_tokens is not None and max_context_tokens > 0:
+            self.max_context_tokens = max_context_tokens
+        else:
+            self.max_context_tokens = get_default_context_limit(provider, model)
+        self.session_id = session_id or f"session_{int(time.time())}"
         self.sessions_dir = sessions_dir or DEFAULT_SESSIONS_DIR
         self.messages: List[Dict] = []
         self.created_at = time.time()
@@ -184,6 +207,7 @@ class SessionManager:
             "events": self.events,
             "total_prompt_tokens": self.total_prompt_tokens,
             "total_completion_tokens": self.total_completion_tokens,
+            "max_context_tokens": self.max_context_tokens,
             "external_metadata": self.external_metadata,
             "estimated_tokens": self.total_estimated_tokens(),
         }
@@ -192,6 +216,7 @@ class SessionManager:
     def from_dict(cls, data: Dict, sessions_dir: Optional[Path] = None) -> "SessionManager":
         manager = cls(
             system_prompt=data.get("system_prompt"),
+            max_context_tokens=data.get("max_context_tokens"),
             session_id=data.get("session_id"),
             provider=data.get("provider"),
             model=data.get("model"),

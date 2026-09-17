@@ -15,10 +15,11 @@ def test_parse_args_defaults():
         assert not args.init
 
 def test_parse_args_with_options():
-    with patch.object(sys, "argv", ["clichat", "-p", "openrouter", "-m", "claude", "What is AI?"]):
+    with patch.object(sys, "argv", ["clichat", "-p", "openrouter", "-m", "claude", "--max-turns", "50", "What is AI?"]):
         args = parse_args()
         assert args.provider == "openrouter"
         assert args.model == "claude"
+        assert args.max_turns == 50
         assert args.prompt == ["What is AI?"]
 
 def test_parse_args_init():

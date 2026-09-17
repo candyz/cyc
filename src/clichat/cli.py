@@ -25,7 +25,7 @@ from clichat.completion import get_completion_script
 from clichat.config import Config, init_config_file, load_config
 from clichat.providers import create_provider
 from clichat.providers.base import BaseProvider
-from clichat.session import SessionManager
+from clichat.session import SessionManager, get_default_context_limit
 from clichat.ui import TerminalUI, create_prompt_session
 
 console = Console()
@@ -46,10 +46,12 @@ class CliApp:
         self.provider_config = config.get_provider(self.provider_name)
         self.model = model_name or self.provider_config.default_model or config.default_model
         self.provider: BaseProvider = create_provider(self.provider_config)
+        max_ctx = getattr(self.provider_config, "max_context_tokens", None)
         self.session = session or SessionManager(
             provider=self.provider_name,
             model=self.model,
             mode=mode,
+            max_context_tokens=max_ctx,
         )
         # Ensure session metadata reflects current settings
         self.session.provider = self.provider_name
@@ -74,6 +76,7 @@ class CliApp:
         self.tool_registry = ToolRegistry()
         self.permission_manager = PermissionManager(effective_perm_mode)
         self.mcp_clients: List[StdioMCPClient] = []
+        default_max_turns = getattr(getattr(self.config, "agent", None), "max_turns", 100)
         self.agent_loop = AgentLoop(
             provider=self.provider,
             model=self.model,
@@ -81,6 +84,7 @@ class CliApp:
             tool_registry=self.tool_registry,
             permission_manager=self.permission_manager,
             ui=self.ui,
+            max_turns=default_max_turns,
         )
 
         if self.mode == "agent" and not self.session.system_prompt:
@@ -170,6 +174,13 @@ class CliApp:
         self.provider_name = provider_name
         self.provider = create_provider(self.provider_config)
         self.model = model_name or self.provider_config.default_model or self.config.default_model
+        self.session.provider = self.provider_name
+        self.session.model = self.model
+        cfg_tokens = getattr(self.provider_config, "max_context_tokens", None)
+        if cfg_tokens:
+            self.session.max_context_tokens = cfg_tokens
+        else:
+            self.session.max_context_tokens = get_default_context_limit(self.provider_name, self.model)
         # Update agent_loop references
         self.agent_loop.provider = self.provider
         self.agent_loop.model = self.model
@@ -231,7 +242,7 @@ class CliApp:
             console.print(r"""[bold cyan]Available Commands:[/bold cyan]
   /help                     Show this help message
   /mode <mode>              Switch or inspect interaction mode (chat or agent)
-  /loop                     Switch or inspect Agent loop execution strategy
+  /loop [strat] [turns]     Switch or inspect Agent loop strategy and max turns limit
   /tools                    List registered agent tools (built-in & MCP)
   /skills                   List available skills (builtin, global, workspace)
   /skill <name>             Apply a specialized skill to agent instructions
@@ -244,7 +255,7 @@ class CliApp:
   /model <name>             Switch active model (tab-completion supported)
   /provider <name>          Switch active provider (tab-completion supported)
   /system <prompt>          Set or inspect system prompt
-  /tokens                   Show context token usage statistics
+  /tokens [limit]           Inspect or update context window token limit
   /usage                    Show token usage, subscription tier & rate limits
   /multiline                Toggle multi-line input mode
   /save <filepath>          Save current conversation to Markdown (.md) or JSON (.json)
@@ -404,13 +415,28 @@ class CliApp:
         elif action == "/loop":
             if not arg:
                 console.print(f"Current agent loop strategy: [bold green]{self.agent_loop.strategy}[/bold green] (Options: standard, plan, minimal)")
+                console.print(f"Current agent loop max turns: [bold green]{self.agent_loop.max_turns}[/bold green]")
             else:
-                strat = arg.lower().strip()
-                if strat in ("standard", "plan", "minimal"):
-                    self.agent_loop.strategy = strat
-                    console.print(f"[bold green]Switched Agent loop strategy to:[/bold green] [bold cyan]{strat}[/bold cyan]")
-                else:
-                    console.print("[yellow]Invalid strategy. Choose 'standard', 'plan', or 'minimal'.[/yellow]")
+                tokens = arg.split()
+                changed_something = False
+                for token in tokens:
+                    t_lower = token.lower()
+                    if t_lower in ("standard", "plan", "minimal"):
+                        self.agent_loop.strategy = t_lower
+                        console.print(f"[bold green]Switched Agent loop strategy to:[/bold green] [bold cyan]{t_lower}[/bold cyan]")
+                        changed_something = True
+                    elif token.isdigit():
+                        val = int(token)
+                        if val > 0:
+                            self.agent_loop.max_turns = val
+                            console.print(f"[bold green]Updated Agent loop max turns to:[/bold green] [bold cyan]{val}[/bold cyan]")
+                            changed_something = True
+                        else:
+                            console.print("[yellow]Max turns must be greater than 0.[/yellow]")
+                    else:
+                        console.print(f"[yellow]Unknown loop parameter: '{token}'. Options: standard, plan, minimal, or an integer turns limit.[/yellow]")
+                if not changed_something:
+                    console.print("[yellow]Usage: /loop [strategy] [max_turns] (e.g. /loop 100, /loop plan 50)[/yellow]")
             return True
         elif action == "/fork":
             forked_session = self.session.fork_session(new_id=arg if arg else None)
@@ -526,6 +552,28 @@ class CliApp:
                 console.print(f"[bold green]System prompt updated:[/bold green] {arg}")
             return True
         elif action == "/tokens":
+            if arg:
+                clean_arg = arg.replace(",", "").replace("_", "").lower()
+                multiplier = 1
+                if clean_arg.endswith("k"):
+                    multiplier = 1_000
+                    clean_arg = clean_arg[:-1]
+                    val_float = float(clean_arg) if clean_arg.replace(".", "", 1).isdigit() else None
+                    new_limit = int(val_float * multiplier) if val_float is not None else None
+                elif clean_arg.endswith("m"):
+                    multiplier = 1_000_000
+                    clean_arg = clean_arg[:-1]
+                    val_float = float(clean_arg) if clean_arg.replace(".", "", 1).isdigit() else None
+                    new_limit = int(val_float * multiplier) if val_float is not None else None
+                else:
+                    new_limit = int(clean_arg) if clean_arg.isdigit() else None
+
+                if new_limit and new_limit > 0:
+                    self.session.max_context_tokens = new_limit
+                    console.print(f"[bold green]Updated context window token limit to:[/bold green] [bold cyan]{new_limit:,}[/bold cyan] tokens")
+                else:
+                    console.print(f"[yellow]Invalid token limit: '{arg}'. Example: /tokens 128000, /tokens 200k, or /tokens 1m[/yellow]")
+
             self.ui.print_tokens_stats(
                 tokens=self.session.total_estimated_tokens(),
                 limit=self.session.max_context_tokens,
@@ -697,6 +745,7 @@ def parse_args():
     parser.add_argument("-y", "--yes", action="store_true", help="Auto-approve all tool actions without interactive prompt")
     parser.add_argument("--read-only", action="store_true", help="Block all mutation tools (write_file, replace, run_command)")
     parser.add_argument("-r", "--resume", nargs="?", const="LATEST", help="Resume a previous session by ID/prefix (or latest if omitted)")
+    parser.add_argument("--max-turns", type=int, default=None, help="Maximum number of turns for Agent loop (default: 100)")
     parser.add_argument("--sessions", action="store_true", help="List all saved chat & agent sessions and exit")
     parser.add_argument("--trust", action="store_true", default=None, help="Explicitly trust current workspace without prompting")
     parser.add_argument("--no-trust", action="store_true", default=None, help="Explicitly restrict current workspace (force Read-Only mode)")
@@ -871,6 +920,9 @@ async def async_main():
         permission_mode=permission_mode,
         session=resumed_session,
     )
+    if args.max_turns is not None and args.max_turns > 0:
+        app.agent_loop.max_turns = args.max_turns
+
     if args.system:
         app.session.set_system_prompt(args.system)
 

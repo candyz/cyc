@@ -25,6 +25,7 @@ class ProviderConfig(BaseModel):
     base_url: str = ""
     api_key: str = "placeholder"
     default_model: str = ""
+    max_context_tokens: Optional[int] = None
 
 class MCPServerConfig(BaseModel):
     command: str
@@ -37,12 +38,16 @@ class UIConfig(BaseModel):
     stream: bool = True
     markdown_render: bool = True
 
+class AgentConfig(BaseModel):
+    max_turns: int = 100
+
 class Config(BaseModel):
     default_provider: str = "ollama"
     default_model: str = ""
     providers: Dict[str, ProviderConfig] = Field(default_factory=dict)
     mcp_servers: Dict[str, MCPServerConfig] = Field(default_factory=dict)
     skills_dirs: List[str] = Field(default_factory=list)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
 
     def get_provider(self, name: Optional[str] = None) -> ProviderConfig:
@@ -92,6 +97,9 @@ DEFAULT_CONFIG_DICT = {
             "type": "opencode",
             "default_model": "opencode/nemotron-3.5-lightning-free",
         },
+    },
+    "agent": {
+        "max_turns": 100,
     },
     "ui": {
         "theme": "monokai",

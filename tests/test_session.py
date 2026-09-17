@@ -128,3 +128,26 @@ def test_session_undo():
 
     # Undo again when empty
     assert session.undo_turn() is False
+
+
+def test_dynamic_context_limits():
+    from clichat.session import get_default_context_limit
+
+    # Gemini / Agy models
+    assert get_default_context_limit("gemini", "gemini-2.5-flash") == 1_000_000
+    assert get_default_context_limit("agy", "gemini-3.8-flash-low") == 1_000_000
+
+    # Claude
+    assert get_default_context_limit("anthropic", "claude-3-7-sonnet") == 200_000
+
+    # DeepSeek / GPT-4o / Nvidia NIM
+    assert get_default_context_limit("nvidia", "nemotron") == 32_768
+    assert get_default_context_limit("openrouter", "deepseek-v3") == 128_000
+
+    # SessionManager default
+    s_gemini = SessionManager(provider="agy", model="gemini-3.8-flash-low")
+    assert s_gemini.max_context_tokens == 1_000_000
+
+    s_custom = SessionManager(provider="agy", model="gemini-3.8-flash-low", max_context_tokens=50_000)
+    assert s_custom.max_context_tokens == 50_000
+

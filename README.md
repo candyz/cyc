@@ -73,7 +73,7 @@ clichat
 | :--- | :--- |
 | `/help` | 顯示所有指令說明 |
 | `/mode <mode>` | 切換交談模式 (chat) 或自主代理模式 (agent) |
-| `/loop` | 切換或檢視 Agent Loop 執行策略（standard, plan, minimal） |
+| `/loop [strat] [turns]` | 切換或檢視 Agent Loop 執行策略與回合上限（預設 100 turns） |
 | `/tools` | 表格化列出所有已註冊的內建與 MCP 工具及其型態 |
 | `/skills` | 列出所有可用技能（內建 commit, test, refactor，全域或專案專屬） |
 | `/skill <name>` | 動態載入技能工作流程指引至 Agent 指令集中 |
@@ -86,7 +86,7 @@ clichat
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
 | `/system <prompt>` | 設定或檢視當前 System Prompt |
-| `/tokens` | 表格化顯示目前對話的 Token 估算量、上限與利用率 |
+| `/tokens [limit]` | 檢視或動態設定 Context Token 上限（支援 200k, 1m, 自適應模型規格） |
 | `/usage` | 檢視 Token 累積用量、模型訂閱狀態與 Rate Limit 限額資訊 |
 | `/multiline` | 切換多行 / 單行輸入模式 |
 | `/save <filepath>` | 儲存會話（`.md` 儲存為 Markdown，`.json` 儲存為結構化會話） |

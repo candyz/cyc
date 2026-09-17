@@ -101,13 +101,26 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 ### 4.1 PTC (Programmatic Tool-Calling，程式化工具呼叫)
 傳統 Agent 需經過多次 round-trip 才能完成「讀取多個檔案 ➔ 數據過濾 ➔ 寫入新檔案」。`run_script` 工具讓模型能夠在單次回合內產出完整 Python/Bash 運算管線，顯著節省 API 延遲與 Token 開銷。
 
-### 4.2 可插拔 Loop 執行策略 (`/loop`)
-- `/loop` 可動態切換代理決策策略：
-  - `standard`（預設）：15 回合動態 ReAct 循環，平衡效率與工具除錯。
+### 4.2 可插拔 Loop 執行策略與上限調整 (`/loop`)
+- `clichat` 預設 Agent 思考與工具執行上限為 **100 回合**（可於 `config.yaml` 的 `agent.max_turns` 設定，或透過啟動參數 `--max-turns <int>` 覆蓋）。
+- `/loop` 指令支援動態切換決策策略與調整單一會話回合上限：
+  - `standard`（預設）：標準多回合 ReAct 循環，平衡效率與工具調度。
   - `plan`：**先規劃後執行**（Plan-and-Solve），適合大型架構重構或跨模組開發。
   - `minimal`：極簡模式（上限 3 回合），專門用於快速快跑測試與 Benchmark。
+  - **指令語法**：
+    - `/loop`：檢視目前策略與最大回合上限。
+    - `/loop <strategy>`：切換策略（如 `/loop plan`）。
+    - `/loop <turns>`：調整回合上限（如 `/loop 100` 或 `/loop 50`）。
+    - `/loop <strategy> <turns>`：同時切換策略與設定回合數（如 `/loop plan 80`）。
 
-### 4.3 跨代理標準技能庫 (Standard Agent Skills)
+### 4.3 動態模型上下文視窗與 Token 管理 (`/tokens`)
+- 現代模型上下文視窗全面自適應：Gemini/Agy 自動調校為 1,000,000 Tokens (1M)，Claude 200,000 Tokens (200k)，DeepSeek / GPT-4o / NIM 128,000 Tokens (128k)，避免以往過早觸發滑動視窗修剪歷史記憶。
+- `/tokens` 指令支援隨時檢視與動態覆寫上下文限制：
+  - `/tokens`：顯示當前 Token 估算量、上下文視窗上限與歷史訊息數。
+  - `/tokens <limit>`：動態調整上限，支援 `k` / `m` 縮寫（例如 `/tokens 200k`、`/tokens 1m`、`/tokens 128000`）。
+
+
+### 4.4 跨代理標準技能庫 (Standard Agent Skills)
 `clichat` 全面遵循並相容現代 AI Agent 行業標準 Skills 規範（如 Google Antigravity / Claude Code / Codex / OpenCode）：
 - **標準 Package 結構**：支援 `<skill_name>/SKILL.md`（含 YAML Frontmatter），以及可選的 `scripts/`、`references/`、`resources/`、`examples/` 輔助目錄。
   ```text
@@ -128,11 +141,11 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
   - 輸入 `/skills` 表格化列出所有可用技能、其所屬來源（`AGY`, `CLAUDE`, `WORKSPACE`, `BUILT-IN`）與輔助套件說明。
   - 輸入 `/skill <name>` 動態載入技能工作流程至 Agent 指令集中。
 
-### 4.4 事件溯源 (Event Sourcing) 與會話分支 (`/fork`)
+### 4.5 事件溯源 (Event Sourcing) 與會話分支 (`/fork`)
 - 每次對話皆會產生追加寫入（Append-only）的 `.events.jsonl` 日誌，完整記錄系統決策、模型輸入與工具觀察結果。
 - 輸入 `/fork <id>`：可隨時將現有對話與工具執行歷程分岔至全新會話分支，進行不同方向的實作嘗試。
 
-### 4.5 雙向寫回橋接器 (Two-Way Bridge / `/sync`)
+### 4.6 雙向寫回橋接器 (Two-Way Bridge / `/sync`)
 `clichat` 不僅能讀取與接續各大外部 AI 編程代理的歷史對話，更能將在 `clichat` 產生的新對話回合、思考過程與工具呼叫**無縫增量寫回**外部代理原生儲存結構中，實現雙向任意切換：
 - **Google Antigravity (`agy`)**：寫回 `~/.gemini/antigravity-cli/brain/<uuid>/.system_generated/logs/transcript.jsonl`。
 - **Claude Code (`claude`)**：寫回 `~/.claude/projects/<slug>/<session>.jsonl`。

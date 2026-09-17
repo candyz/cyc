@@ -20,7 +20,7 @@ class AgentLoop:
         session: SessionManager,
         tool_registry: Optional[ToolRegistry] = None,
         permission_manager: Optional[PermissionManager] = None,
-        max_turns: int = 15,
+        max_turns: int = 100,
         ui: Optional[Any] = None,
         strategy: str = "standard",
     ):
