@@ -73,3 +73,31 @@ async def test_non_openrouter_keeps_all_models():
         "llama3.3:latest",
         "qwen2.5:latest",
     ]
+
+
+def test_parse_args_agent_flags():
+    with patch.object(sys, "argv", ["clichat", "--agent", "-y", "--read-only"]):
+        args = parse_args()
+        assert args.agent is True
+        assert args.yes is True
+        assert args.read_only is True
+
+
+@pytest.mark.asyncio
+async def test_handle_slash_command_mode_and_tools():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+    assert app.mode == "chat"
+
+    handled = await app.handle_slash_command("/mode agent")
+    assert handled is True
+    assert app.mode == "agent"
+    assert app.session.system_prompt is not None
+
+    handled = await app.handle_slash_command("/mode chat")
+    assert handled is True
+    assert app.mode == "chat"
+    assert app.session.system_prompt is None
+
+    handled = await app.handle_slash_command("/tools")
+    assert handled is True

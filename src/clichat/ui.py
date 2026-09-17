@@ -1,7 +1,7 @@
 import asyncio
 import sys
 from pathlib import Path
-from typing import AsyncGenerator, Callable, Dict, List, Optional
+from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
@@ -45,6 +45,8 @@ class CommandCompleter(Completer):
             "/provider",
             "/system",
             "/tokens",
+            "/mode",
+            "/tools",
             "/multiline",
             "/save",
             "/load",
@@ -88,14 +90,26 @@ class TerminalUI:
         self.stream_markdown = stream_markdown
         self.console = console
 
-    def print_banner(self, provider: str, model: str, multiline: bool = False):
-        mode_text = "[magenta]Multi-line Mode[/magenta]" if multiline else "[dim]Single-line Mode[/dim]"
+    def print_banner(self, provider: str, model: str, multiline: bool = False, mode: str = "chat"):
+        mode_label = "[bold magenta]🤖 Coding Agent Mode[/bold magenta]" if mode == "agent" else "[dim]💬 Chat Mode[/dim]"
+        ml_label = "[magenta]Multi-line[/magenta]" if multiline else "[dim]Single-line[/dim]"
         title = f"[bold green]clichat[/bold green] [dim]v{__version__}[/dim]"
         body = (
-            f"Provider: [bold cyan]{provider}[/bold cyan]  |  Model: [bold cyan]{model}[/bold cyan]  |  {mode_text}\n"
-            f"[dim]Commands: /help, /models, /model <name>, /provider <name>, /multiline, /exit[/dim]"
+            f"Provider: [bold cyan]{provider}[/bold cyan]  |  Model: [bold cyan]{model}[/bold cyan]  |  {mode_label}  |  {ml_label}\n"
+            f"[dim]Commands: /help, /mode [chat|agent], /tools, /models, /model <name>, /provider <name>, /exit[/dim]"
         )
-        self.console.print(Panel(body, title=title, border_style="cyan", box=ROUNDED))
+        self.console.print(Panel(body, title=title, border_style="cyan" if mode == "chat" else "magenta", box=ROUNDED))
+
+    def print_tools_table(self, tools: List[Any]):
+        table = Table(title=f"Registered Agent Tools ({len(tools)})", box=ROUNDED)
+        table.add_column("Tool Name", style="bold cyan")
+        table.add_column("Type", justify="center")
+        table.add_column("Description", style="dim")
+
+        for t in tools:
+            type_label = "[bold red]MUTATION[/bold red]" if getattr(t, "is_mutation", False) else "[green]READ-ONLY[/green]"
+            table.add_row(t.name, type_label, t.description)
+        self.console.print(table)
 
     def print_models_table(self, models: List[str], current_model: str, provider: str):
         table = Table(title=f"Models available for '{provider}' ({len(models)})", box=ROUNDED)

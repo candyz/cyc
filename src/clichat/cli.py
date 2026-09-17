@@ -8,6 +8,13 @@ from prompt_toolkit import PromptSession
 from rich.console import Console
 
 from clichat import __version__
+from clichat.agent import (
+    AgentLoop,
+    PermissionManager,
+    PermissionMode,
+    ToolRegistry,
+    build_coding_agent_system_prompt,
+)
 from clichat.config import Config, init_config_file, load_config
 from clichat.providers import create_provider
 from clichat.providers.base import BaseProvider
@@ -18,7 +25,14 @@ console = Console()
 HISTORY_FILE = Path.home() / ".local" / "share" / "clichat" / "history"
 
 class CliApp:
-    def __init__(self, config: Config, provider_name: Optional[str] = None, model_name: Optional[str] = None):
+    def __init__(
+        self,
+        config: Config,
+        provider_name: Optional[str] = None,
+        model_name: Optional[str] = None,
+        mode: str = "chat",
+        permission_mode: PermissionMode = PermissionMode.INTERACTIVE,
+    ):
         self.config = config
         self.provider_name = provider_name or config.default_provider
         self.provider_config = config.get_provider(self.provider_name)
@@ -28,6 +42,21 @@ class CliApp:
         self.ui = TerminalUI(stream_markdown=config.ui.markdown_render)
         self.cached_models: List[str] = []
         self.multiline_mode: bool = False
+
+        # Agent configuration
+        self.mode = mode  # "chat" or "agent"
+        self.tool_registry = ToolRegistry()
+        self.permission_manager = PermissionManager(permission_mode)
+        self.agent_loop = AgentLoop(
+            provider=self.provider,
+            model=self.model,
+            session=self.session,
+            tool_registry=self.tool_registry,
+            permission_manager=self.permission_manager,
+        )
+
+        if self.mode == "agent":
+            self.session.set_system_prompt(build_coding_agent_system_prompt())
 
     def get_known_models(self) -> List[str]:
         return self.cached_models
@@ -50,11 +79,21 @@ class CliApp:
         self.provider_name = provider_name
         self.provider = create_provider(self.provider_config)
         self.model = model_name or self.provider_config.default_model or self.config.default_model
+        # Update agent_loop references
+        self.agent_loop.provider = self.provider
+        self.agent_loop.model = self.model
         console.print(f"[bold green]Switched to provider:[/bold green] {self.provider_name} (model: {self.model})")
         # Trigger background model cache refresh
         asyncio.create_task(self.update_cached_models())
 
     async def run_single_prompt(self, user_prompt: str) -> None:
+        if self.mode == "agent":
+            try:
+                await self.agent_loop.run_turn(user_prompt)
+            except Exception as e:
+                console.print(f"\n[bold red]Agent Error:[/bold red] {e}")
+            return
+
         self.session.add_user_message(user_prompt)
         try:
             stream_gen = self.provider.chat_stream(self.session.get_messages(), self.model)
@@ -81,11 +120,15 @@ class CliApp:
             sys.exit(0)
         elif action == "/clear":
             self.session.clear()
+            if self.mode == "agent":
+                self.session.set_system_prompt(build_coding_agent_system_prompt())
             console.print("[bold yellow]Session history cleared.[/bold yellow]")
             return True
         elif action == "/help":
             console.print("""[bold cyan]Available Commands:[/bold cyan]
   /help               Show this help message
+  /mode [chat|agent]  Switch or inspect interaction mode (chat or agent)
+  /tools              List registered agent tools and descriptions
   /models             List available models for the active provider
   /model <name>       Switch active model (tab-completion supported)
   /provider <name>    Switch active provider (tab-completion supported)
@@ -96,6 +139,24 @@ class CliApp:
   /load <filepath>    Load previous conversation from a JSON file
   /clear              Clear current session history
   /exit or /quit      Exit CLI""")
+            return True
+        elif action == "/mode":
+            if not arg:
+                console.print(f"Current mode: [bold {'magenta' if self.mode == 'agent' else 'cyan'}]{self.mode.upper()}[/bold {'magenta' if self.mode == 'agent' else 'cyan'}]")
+            else:
+                target_mode = arg.lower()
+                if target_mode in ("chat", "agent"):
+                    self.mode = target_mode
+                    if self.mode == "agent":
+                        self.session.set_system_prompt(build_coding_agent_system_prompt())
+                    else:
+                        self.session.set_system_prompt(None)
+                    console.print(f"[bold green]Switched mode to:[/bold green] [bold {'magenta' if self.mode == 'agent' else 'cyan'}]{self.mode.upper()}[/bold {'magenta' if self.mode == 'agent' else 'cyan'}]")
+                else:
+                    console.print("[yellow]Invalid mode. Choose 'chat' or 'agent'.[/yellow]")
+            return True
+        elif action == "/tools":
+            self.ui.print_tools_table(self.tool_registry.all_tools())
             return True
         elif action == "/multiline":
             self.multiline_mode = not self.multiline_mode
@@ -128,6 +189,7 @@ class CliApp:
                 console.print(f"Current model: [bold green]{self.model}[/bold green]")
             else:
                 self.model = arg
+                self.agent_loop.model = arg
                 console.print(f"[bold green]Switched model to:[/bold green] {self.model}")
             return True
         elif action == "/provider":
@@ -183,7 +245,7 @@ class CliApp:
         return False
 
     async def repl(self) -> None:
-        self.ui.print_banner(self.provider_name, self.model, self.multiline_mode)
+        self.ui.print_banner(self.provider_name, self.model, self.multiline_mode, mode=self.mode)
         # Prefetch model list for tab completion
         asyncio.create_task(self.update_cached_models())
 
@@ -195,7 +257,7 @@ class CliApp:
                 multiline=self.multiline_mode,
             )
 
-            prompt_label = "... > " if self.multiline_mode else "you > "
+            prompt_label = "... > " if self.multiline_mode else f"[{self.mode}] you > "
 
             try:
                 user_input = await asyncio.to_thread(prompt_session.prompt, prompt_label)
@@ -207,6 +269,13 @@ class CliApp:
                     handled = await self.handle_slash_command(user_input)
                     if handled:
                         continue
+
+                if self.mode == "agent":
+                    try:
+                        await self.agent_loop.run_turn(user_input)
+                    except Exception as e:
+                        console.print(f"\n[bold red]Agent Error:[/bold red] {e}\n")
+                    continue
 
                 self.session.add_user_message(user_input)
 
@@ -227,15 +296,18 @@ class CliApp:
                 break
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="CLI Chat with Local & Cloud LLMs")
+    parser = argparse.ArgumentParser(description="CLI Chat & Autonomous Coding Agent with Local & Cloud LLMs")
     parser.add_argument("-v", "--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("prompt", nargs="*", help="Direct prompt or piped query (or 'init' to initialize config)")
-    parser.add_argument("-p", "--provider", help="Specify provider (e.g. ollama, openrouter, omlx, nvidia, gemini)")
+    parser.add_argument("-p", "--provider", help="Specify provider (e.g. ollama, openrouter, omlx, nvidia, gemini, agy, opencode)")
     parser.add_argument("-m", "--model", help="Specify model name")
     parser.add_argument("-s", "--system", help="Set system prompt")
     parser.add_argument("-c", "--config", help="Custom config path")
     parser.add_argument("--init", action="store_true", help="Generate default configuration file")
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite existing config during init")
+    parser.add_argument("--agent", action="store_true", help="Enable autonomous Coding Agent mode")
+    parser.add_argument("-y", "--yes", action="store_true", help="Auto-approve all tool actions without interactive prompt")
+    parser.add_argument("--read-only", action="store_true", help="Block all mutation tools (write_file, replace, run_command)")
     return parser.parse_args()
 
 async def async_main():
@@ -259,7 +331,22 @@ async def async_main():
 
     config = load_config(config_path)
 
-    app = CliApp(config, provider_name=args.provider, model_name=args.model)
+    # Determine mode and permissions
+    mode = "agent" if args.agent else "chat"
+    if args.read_only:
+        permission_mode = PermissionMode.READ_ONLY
+    elif args.yes:
+        permission_mode = PermissionMode.AUTO
+    else:
+        permission_mode = PermissionMode.INTERACTIVE
+
+    app = CliApp(
+        config,
+        provider_name=args.provider,
+        model_name=args.model,
+        mode=mode,
+        permission_mode=permission_mode,
+    )
     if args.system:
         app.session.set_system_prompt(args.system)
 

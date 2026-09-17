@@ -141,42 +141,42 @@ class Tool(ABC):
 ## 3. 分階段實作計劃 (Implementation Plan)
 
 ### Phase 1: 核心工具集與統一 Tool 抽象介面 (預估 2 天)
-- [ ] 建立 `src/clichat/agent/tools/` 模組目錄。
-- [ ] 實作 `Tool` 基礎抽象類別，包含 JSON Schema 生成與 OpenAI/Gemini 適配器。
-- [ ] 實作 6 大核心內建工具：
+- [x] 建立 `src/clichat/agent/tools/` 模組目錄。
+- [x] 實作 `Tool` 基礎抽象類別，包含 JSON Schema 生成與 OpenAI/Gemini 適配器。
+- [x] 實作 6 大核心內建工具：
   - `read_file` (支援行號切片與超長防護)
   - `write_file` (安全父目錄自動建立)
   - `replace_file_content` (精確單一區塊替換)
   - `run_command` (非同步執行、逾時控制與輸出截斷)
   - `list_dir` (格式化目錄樹)
   - `grep_search` (以 Python 原生或 ripgrep 進行正則搜尋)
-- [ ] 撰寫單元測試覆蓋所有工具的執行與邊界情況。
+- [x] 撰寫單元測試覆蓋所有工具的執行與邊界情況。
 
 ### Phase 2: Agent ReAct 執行迴圈與多後端串接 (預估 3 天)
-- [ ] 擴展 `BaseProvider` 支援 `tools` 參數與非串流/串流之 Tool Call 回傳解析。
-- [ ] 更新 `OpenAICompatibleProvider`：解析 response 中的 `tool_calls`（對應 Ollama, OpenRouter, NVIDIA）。
-- [ ] 更新 `GeminiProvider`：對接 `types.Tool` 與 function call 結構。
-- [ ] 實作 `AgentLoop`：
+- [x] 擴展 `BaseProvider` 支援 `tools` 參數與非串流/串流之 Tool Call 回傳解析。
+- [x] 更新 `OpenAICompatibleProvider`：解析 response 中的 `tool_calls`（對應 Ollama, OpenRouter, NVIDIA）。
+- [x] 更新 `GeminiProvider`：對接 `types.Tool` 與 function call 結構。
+- [x] 實作 `AgentLoop`：
   - 模型接收系統提示詞與可用工具清單。
   - 當模型回傳 `tool_calls` 時，派發執行工具並將 `tool` role 訊息加回對話。
   - 迴圈自動推進直至模型判定任務完成或達到最大反覆次數（防止死循環，預設上限 15 輪）。
-- [ ] 支援 Slash 指令切換模式（例如 `/mode chat` 與 `/mode agent`）。
+- [x] 支援 Slash 指令切換模式（例如 `/mode chat` 與 `/mode agent`）。
 
 ### Phase 3: 安全審批與 Human-in-the-Loop 機制 (預估 2 天)
-- [ ] 實作 `PermissionManager`：
+- [x] 實作 `PermissionManager`：
   - 分類工具安全等級（`READ_ONLY`, `MUTATION`, `EXECUTE`）。
   - 終端提示使用者確認 (`[y] Yes, [n] No, [a] Always allow for this session`)。
-- [ ] 新增命令列安全參數：
+- [x] 新增命令列安全參數：
   - `-y` / `--yes`：全自動核准所有工具。
   - `--read-only`：禁止所有寫檔與執行指令工具。
-- [ ] 支援中斷機制：使用者可隨時按下 `Ctrl+C` 取消後續工具鏈執行。
+- [x] 支援中斷機制：使用者可隨時按下 `Ctrl+C` 取消後續工具鏈執行。
 
 ### Phase 4: 終端 Diff 渲染與代碼庫上下文增強 (預估 2 天)
-- [ ] 整合 Rich Diff：在檔案置換或寫入前，在終端渲染彩色統一修訂格式 (Unified Diff)。
-- [ ] 專案感知系統提示詞 (System Prompt with Workspace Awareness)：
+- [x] 整合 Rich Diff：在檔案置換或寫入前，在終端渲染彩色統一修訂格式 (Unified Diff)。
+- [x] 專案感知系統提示詞 (System Prompt with Workspace Awareness)：
   - 自動偵測工作目錄路徑、Git 狀態 (`git branch`, `git status --short`)。
   - 自動載入專案規範檔案（如 `GEMINI.md`, `CLAUDE.md`, `.cursorrules`）。
-- [ ] 實作專案索引精簡指令（如 `/context` 查看當前 Agent 感知之檔案空間）。
+- [x] 實作專案索引與工具查看指令（如 `/tools` 查看當前 Agent 已註冊工具）。
 
 ### Phase 5: MCP (Model Context Protocol) 擴充支援 (預估 2 天)
 - [ ] 支援外部 MCP Server 接入（透過 stdio 串接）。
