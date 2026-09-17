@@ -6,6 +6,7 @@ from clichat.providers import create_provider
 from clichat.providers.openai import OpenAICompatibleProvider
 from clichat.providers.gemini import GeminiProvider
 from clichat.providers.agy import AntigravityProvider, DEFAULT_AGY_MODELS
+from clichat.providers.opencode import OpenCodeProvider, DEFAULT_OPENCODE_ZEN_MODELS
 
 def test_create_openai_provider():
     cfg = ProviderConfig(
@@ -150,3 +151,67 @@ async def test_agy_list_models_mock():
         assert "gemini-3.1-pro-high" in models
         assert "gemini-3.8-flash-low" in models
         assert "claude-sonnet-4-6" in models
+
+def test_create_opencode_provider():
+    cfg = ProviderConfig(
+        type="opencode",
+        default_model="opencode/nemotron-3.5-lightning-free",
+    )
+    provider = create_provider(cfg)
+    assert isinstance(provider, OpenCodeProvider)
+
+def test_opencode_normalize_model():
+    provider = OpenCodeProvider()
+    assert provider._normalize_model("nemotron-3.5-lightning-free") == "opencode/nemotron-3.5-lightning-free"
+    assert provider._normalize_model("opencode/hy3-free") == "opencode/hy3-free"
+
+@pytest.mark.asyncio
+async def test_opencode_chat_stream_mock():
+    provider = OpenCodeProvider(binary_path="/dummy/path/opencode")
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.wait = AsyncMock(return_value=0)
+
+    # Mock JSON lines from opencode run --format json
+    lines = [
+        b'{"type":"step_start"}\n',
+        b'{"type":"text","part":{"type":"text","text":"Hello from "}}\n',
+        b'{"type":"text","part":{"type":"text","text":"OpenCode!"}}\n',
+        b'{"type":"step_finish"}\n',
+        b'',
+    ]
+    line_iter = iter(lines)
+    mock_proc.stdout.readline = AsyncMock(side_effect=lambda: next(line_iter))
+
+    with patch("shutil.which", return_value="/dummy/path/opencode"), \
+         patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        chunks = []
+        async for chunk in provider.chat_stream([{"role": "user", "content": "hi"}], model="opencode/nemotron-3.5-lightning-free"):
+            chunks.append(chunk)
+
+        assert "".join(chunks) == "Hello from OpenCode!"
+
+@pytest.mark.asyncio
+async def test_opencode_list_models_mock():
+    provider = OpenCodeProvider(binary_path="/dummy/path/opencode")
+
+    mock_output = (
+        b"opencode/nemotron-3.5-lightning-free\n"
+        b"opencode/deepseek-v4-flash-free\n"
+        b"opencode/paid-pro-model\n"
+        b"openrouter/google/gemma-4:free\n"
+    )
+
+    mock_proc = MagicMock()
+    mock_proc.returncode = 0
+    mock_proc.communicate = AsyncMock(return_value=(mock_output, b""))
+
+    with patch("shutil.which", return_value="/dummy/path/opencode"), \
+         patch("asyncio.create_subprocess_exec", return_value=mock_proc):
+        models = await provider.list_models()
+        # Should only include opencode/ models with 'free'
+        assert "opencode/nemotron-3.5-lightning-free" in models
+        assert "opencode/deepseek-v4-flash-free" in models
+        assert "opencode/paid-pro-model" not in models
+        assert "openrouter/google/gemma-4:free" not in models

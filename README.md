@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-- **多後端無縫切換**：支援本地 Ollama、OMLX (Apple Silicon MLX)、Google Antigravity (`agy`，直接使用 Gemini AI Pro 訂閱額度) 及各大雲端 API (Gemini, OpenRouter, NVIDIA NIM)。
+- **多後端無縫切換**：支援本地 Ollama、OMLX (Apple Silicon MLX)、Google Antigravity (`agy`，直連 Gemini AI Pro 訂閱額度)、OpenCode (`opencode`，直連 Zen free 免費模型) 及各大雲端 API (Gemini, OpenRouter, NVIDIA NIM)。
 - **即時 Markdown 串流渲染**：結合 `rich.live.Live`，文字隨生成即時渲染 Markdown 格式、程式碼區塊高亮與排版。
 - **互動式 REPL 與智慧補全**：
   - 輸入歷史自動跨終端持久化保存 (`~/.local/share/clichat/history`)。
@@ -29,8 +29,9 @@ uv run clichat init
 uv run clichat
 
 # 3. 指定 Provider 與 Model
-uv run clichat -p agy -m "gemini-3.1-pro-high"     # 使用本地 agy，直連 Gemini Pro 訂閱額度
-uv run clichat -p gemini -m "gemini-2.5-flash"      # 使用 Google AI Studio API Key
+uv run clichat -p agy -m "gemini-3.1-pro-high"                             # 使用本機 agy，直連 Gemini Pro 訂閱額度
+uv run clichat -p opencode -m "opencode/nemotron-3.5-lightning-free"      # 使用本機 opencode，直連 Zen free 免費模型
+uv run clichat -p gemini -m "gemini-2.5-flash"                              # 使用 Google AI Studio API Key
 uv run clichat -p ollama -m "llama3.3:latest"
 
 # 4. 單次問答 / Pipeline 模式

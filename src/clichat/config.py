@@ -80,6 +80,10 @@ DEFAULT_CONFIG_DICT = {
             "type": "agy",
             "default_model": "gemini-3.1-pro-high",
         },
+        "opencode": {
+            "type": "opencode",
+            "default_model": "opencode/nemotron-3.5-lightning-free",
+        },
     },
     "ui": {
         "theme": "monokai",
@@ -153,6 +157,11 @@ providers:
   agy:
     type: agy
     default_model: "gemini-3.1-pro-high"
+
+  # 7. OpenCode (Uses local opencode CLI with Zen free models, no API key needed)
+  opencode:
+    type: opencode
+    default_model: "opencode/nemotron-3.5-lightning-free"
 
 # Terminal UI configuration
 ui:

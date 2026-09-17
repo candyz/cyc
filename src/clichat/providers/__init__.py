@@ -4,6 +4,7 @@ from clichat.providers.base import BaseProvider
 from clichat.providers.openai import OpenAICompatibleProvider
 from clichat.providers.gemini import GeminiProvider
 from clichat.providers.agy import AntigravityProvider
+from clichat.providers.opencode import OpenCodeProvider
 
 def create_provider(provider_config: ProviderConfig) -> BaseProvider:
     provider_type = provider_config.type.lower()
@@ -20,6 +21,17 @@ def create_provider(provider_config: ProviderConfig) -> BaseProvider:
         return AntigravityProvider(
             binary_path=provider_config.base_url if provider_config.base_url else None
         )
+    elif provider_type in ("opencode", "zen"):
+        return OpenCodeProvider(
+            binary_path=provider_config.base_url if provider_config.base_url else None
+        )
     raise ValueError(f"Unsupported provider type: {provider_config.type}")
 
-__all__ = ["BaseProvider", "OpenAICompatibleProvider", "GeminiProvider", "AntigravityProvider", "create_provider"]
+__all__ = [
+    "BaseProvider",
+    "OpenAICompatibleProvider",
+    "GeminiProvider",
+    "AntigravityProvider",
+    "OpenCodeProvider",
+    "create_provider",
+]

@@ -30,6 +30,7 @@ def test_load_default_config():
     assert "ollama" in config.providers
     assert "openrouter" in config.providers
     assert "agy" in config.providers
+    assert "opencode" in config.providers
     assert config.get_provider("ollama").base_url == "http://localhost:11434/v1"
     assert config.get_provider("omlx").base_url == "http://localhost:8000/v1"
 
@@ -44,6 +45,7 @@ def test_init_config_file(tmp_path: Path):
     assert "gemini" in content
     assert "openrouter" in content
     assert "agy" in content
+    assert "opencode" in content
 
     # Should raise error if already exists and force is False
     with pytest.raises(FileExistsError):
