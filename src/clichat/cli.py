@@ -125,9 +125,9 @@ class CliApp:
             console.print("[bold yellow]Session history cleared.[/bold yellow]")
             return True
         elif action == "/help":
-            console.print("""[bold cyan]Available Commands:[/bold cyan]
+            console.print(r"""[bold cyan]Available Commands:[/bold cyan]
   /help               Show this help message
-  /mode [chat|agent]  Switch or inspect interaction mode (chat or agent)
+  /mode \[chat|agent] Switch or inspect interaction mode (chat or agent)
   /tools              List registered agent tools and descriptions
   /models             List available models for the active provider
   /model <name>       Switch active model (tab-completion supported)

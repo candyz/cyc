@@ -26,6 +26,16 @@ def test_command_completer():
     assert len(completions_prov) == 1
     assert completions_prov[0].text == "openrouter"
 
+    # Test /mode argument completion
+    doc_mode = Document("/mode ")
+    completions_mode = list(completer.get_completions(doc_mode, None))
+    assert [c.text for c in completions_mode] == ["chat", "agent"]
+
+    doc_mode_ag = Document("/mode ag")
+    completions_mode_ag = list(completer.get_completions(doc_mode_ag, None))
+    assert len(completions_mode_ag) == 1
+    assert completions_mode_ag[0].text == "agent"
+
 def test_terminal_ui_render():
     ui = TerminalUI(stream_markdown=True)
     # Ensure tables and banners format cleanly without exceptions

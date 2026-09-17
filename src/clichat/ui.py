@@ -71,7 +71,11 @@ class CommandCompleter(Completer):
         cmd = parts[0].lower()
         arg_prefix = parts[1] if len(parts) > 1 else ""
 
-        if cmd == "/model":
+        if cmd == "/mode":
+            for mode in ("chat", "agent"):
+                if mode.startswith(arg_prefix.lower()):
+                    yield Completion(mode, start_position=-len(arg_prefix))
+        elif cmd == "/model":
             for m in self.get_models():
                 if m.lower().startswith(arg_prefix.lower()):
                     yield Completion(m, start_position=-len(arg_prefix))
