@@ -42,6 +42,7 @@ class Config(BaseModel):
     default_model: str = ""
     providers: Dict[str, ProviderConfig] = Field(default_factory=dict)
     mcp_servers: Dict[str, MCPServerConfig] = Field(default_factory=dict)
+    skills_dirs: List[str] = Field(default_factory=list)
     ui: UIConfig = Field(default_factory=UIConfig)
 
     def get_provider(self, name: Optional[str] = None) -> ProviderConfig:

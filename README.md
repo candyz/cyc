@@ -60,7 +60,7 @@ clichat
   - **PTC (Programmatic Tool-Calling)**：透過 `run_script` 支援以單一 Turn 執行 Python / Bash 多步驟腳本與管線運算，顯著節省推論輪次。
   - **可插拔 Loop 策略**：支援 `/loop` 動態切換 `standard` (15 輪 ReAct)、`plan` (先規劃後執行)、`minimal` (3 輪評測/快跑)。
   - **Event-Sourced 與 Session 分支**：全面支援 Append-only `.events.jsonl` 事件源追蹤，並可使用 `/fork` 即時分岔會話實驗分支。
-  - **Skills vs. Plugins 分層架構**：提供 `SkillManager`，支援系統內建技能（`commit`, `test`, `refactor`）、全域技能 (`~/.config/clichat/skills`) 與專案工作區技能 (`.clichat/skills`)，支援 `/skills` 與 `/skill <name>`。
+  - **標準 Agent Skills 支援**：支援標準 `<skill_name>/SKILL.md`（YAML frontmatter 與 scripts/references 等子目錄）及單檔 `.md`。自動跨工具探索 Google Antigravity、Claude Code、OpenCode、全域及專案工作區技能。
   - **多代理對話相容**：無縫列出與接續 agy (`gemini`), claude code, pi, opencode 等代理之歷史會話 (`/sessions`, `/resume`)。
 - **安全與信任機制**：
   - 專案工作區信任管理 (`/trust [show|allow|deny]`)，首次執行提示授權，限制未信任目錄為唯讀模式。

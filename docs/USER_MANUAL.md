@@ -107,14 +107,26 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
   - `plan`：**先規劃後執行**（Plan-and-Solve），適合大型架構重構或跨模組開發。
   - `minimal`：極簡模式（上限 3 回合），專門用於快速快跑測試與 Benchmark。
 
-### 4.3 專業技能庫 (Skills Management)
-`clichat` 提供系統化技能庫，引導 Agent 遵循最佳工程實踐：
-- 輸入 `/skills` 查看所有可用技能。
-- 輸入 `/skill <name>` 動態載入技能工作流程：
-  - `commit`：自動遵循 Conventional Commits 規範。
-  - `test`：結構化測試、測試失敗分析與精準修復流程。
-  - `refactor`：安全代碼重構（測試保護傘、單一責任原則）。
-- **自訂技能擴充**：只要在全域目錄 `~/.config/clichat/skills/<name>.md` 或專案目錄 `.clichat/skills/<name>.md` 放置 Markdown 指引，即可自動掃描並載入。
+### 4.3 跨代理標準技能庫 (Standard Agent Skills)
+`clichat` 全面遵循並相容現代 AI Agent 行業標準 Skills 規範（如 Google Antigravity / Claude Code / Codex / OpenCode）：
+- **標準 Package 結構**：支援 `<skill_name>/SKILL.md`（含 YAML Frontmatter），以及可選的 `scripts/`、`references/`、`resources/`、`examples/` 輔助目錄。
+  ```text
+  skills/<skill_name>/
+  ├── SKILL.md          # 核心流程指引（含 name, description, version 等 YAML 前置標籤）
+  ├── scripts/          # 可執行腳本與工具封裝
+  └── references/       # 詳細技術文件與手冊（需要時漸進查閱，節省上下文）
+  ```
+- **單檔 Markdown**：亦相容極簡的 `<skill_name>.md` 技能指引。
+- **多代理與跨工具自動探索 (Auto-Discovery)**：
+  - **系統內建**：`commit`（Conventional Commits）、`test`（結構化測試與調錯）、`refactor`（安全重構）。
+  - **Google Antigravity / Gemini**：自動探索 `~/.gemini/antigravity-cli/builtin/skills/` 與 `~/.gemini/skills/`。
+  - **Claude Code**：自動探索 `~/.claude/skills/`（如現有的 `prompt-master`、`agent-reach` 等）。
+  - **OpenCode**：自動探索 `~/.config/opencode/skills/`。
+  - **全域與自訂設定**：`~/.config/clichat/skills/` 及 `config.yaml` 的 `skills_dirs` 清單。
+  - **專案工作區規範**：依優先順序載入專案內的 `.agents/skills/`、`.claude/skills/`、`.clichat/skills/` 或 `skills/`。
+- **指令用法**：
+  - 輸入 `/skills` 表格化列出所有可用技能、其所屬來源（`AGY`, `CLAUDE`, `WORKSPACE`, `BUILT-IN`）與輔助套件說明。
+  - 輸入 `/skill <name>` 動態載入技能工作流程至 Agent 指令集中。
 
 ### 4.4 事件溯源 (Event Sourcing) 與會話分支 (`/fork`)
 - 每次對話皆會產生追加寫入（Append-only）的 `.events.jsonl` 日誌，完整記錄系統決策、模型輸入與工具觀察結果。

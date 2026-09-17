@@ -245,13 +245,33 @@ class TerminalUI:
             table.add_row(t.name, source_badge, type_label, t.description)
         self.console.print(table)
 
-    def print_skills_table(self, skills: List[Dict[str, str]]):
+    def print_skills_table(self, skills: List[Dict[str, Any]]):
         table = Table(title=f"Available Skills ({len(skills)})", box=ROUNDED)
-        table.add_column("Skill Name", style="bold cyan", width=15)
+        table.add_column("Skill Name", style="bold cyan", width=22)
+        table.add_column("Source", justify="center", width=14)
         table.add_column("Description", style="dim")
 
         for s in skills:
-            table.add_row(s["name"], s.get("description", ""))
+            src = s.get("source", "builtin")
+            if src == "builtin":
+                source_badge = "[dim]BUILT-IN[/dim]"
+            elif "workspace" in src:
+                source_badge = "[bold green]WORKSPACE[/bold green]"
+            elif src in ("antigravity", "gemini"):
+                source_badge = "[bold cyan]AGY[/bold cyan]"
+            elif src == "claude":
+                source_badge = "[bold magenta]CLAUDE[/bold magenta]"
+            elif src == "opencode":
+                source_badge = "[bold blue]OPENCODE[/bold blue]"
+            else:
+                source_badge = f"[yellow]{src.upper()}[/yellow]"
+
+            desc = s.get("description", "")
+            helpers = s.get("helpers", [])
+            if helpers:
+                desc += f" [dim cyan]({', '.join(helpers)})[/dim cyan]"
+
+            table.add_row(s["name"], source_badge, desc)
         self.console.print(table)
 
     def print_models_table(self, models: List[str], current_model: str, provider: str):

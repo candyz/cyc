@@ -431,14 +431,14 @@ class CliApp:
                 console.print(f"[bold red]Sync failed:[/bold red] {result.get('error', 'Unknown error')}")
             return True
         elif action == "/skills":
-            skills = SkillManager.list_skills(self.workspace_path)
+            skills = SkillManager.list_skills(self.workspace_path, custom_skills_dirs=self.config.skills_dirs)
             self.ui.print_skills_table(skills)
             return True
         elif action == "/skill":
             if not arg:
                 console.print("[yellow]Usage: /skill <name>[/yellow]")
             else:
-                skill = SkillManager.get_skill(arg, self.workspace_path)
+                skill = SkillManager.get_skill(arg, self.workspace_path, custom_skills_dirs=self.config.skills_dirs)
                 if not skill:
                     console.print(f"[bold red]Skill '{arg}' not found.[/bold red] Use '/skills' to list available skills.")
                 else:

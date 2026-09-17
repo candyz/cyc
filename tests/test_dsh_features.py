@@ -109,6 +109,44 @@ def test_skill_manager_discovery_and_lookup(tmp_path):
     assert deploy_skill["description"] == "Production Deployment Skill"
     assert "Run deployment scripts" in deploy_skill["content"]
 
+    # Test Standard Package Skill format with frontmatter and helper subdirectories in .agents/skills
+    agents_skills_dir = tmp_path / ".agents" / "skills"
+    standard_skill_dir = agents_skills_dir / "docker-workflow"
+    standard_skill_dir.mkdir(parents=True)
+    (standard_skill_dir / "scripts").mkdir()
+    (standard_skill_dir / "references").mkdir()
+
+    standard_skill_content = """---
+name: docker-workflow
+description: Automated Docker container building and deployment procedures.
+version: 2.1.0
+---
+
+# Docker Workflow Runbook
+Follow the steps in references/deploy.md and run scripts/build.sh.
+"""
+    (standard_skill_dir / "SKILL.md").write_text(standard_skill_content, encoding="utf-8")
+
+    all_skills = SkillManager.list_skills(tmp_path)
+    docker_skill = next((s for s in all_skills if s["name"] == "docker-workflow"), None)
+    assert docker_skill is not None
+    assert docker_skill["description"] == "Automated Docker container building and deployment procedures."
+    assert docker_skill["frontmatter"]["version"] == "2.1.0"
+    assert "scripts" in docker_skill["helpers"]
+    assert "references" in docker_skill["helpers"]
+    assert "workspace:agents" in docker_skill["source"]
+
+    # Test custom skills directory from user config
+    custom_external_dir = tmp_path / "custom_agent_skills"
+    custom_external_dir.mkdir()
+    (custom_external_dir / "ci-cd.md").write_text("---\nname: ci-cd\ndescription: CI/CD automation\n---\nRun CI", encoding="utf-8")
+
+    custom_skills = SkillManager.list_skills(tmp_path, custom_skills_dirs=[str(custom_external_dir)])
+    ci_skill = next((s for s in custom_skills if s["name"] == "ci-cd"), None)
+    assert ci_skill is not None
+    assert ci_skill["description"] == "CI/CD automation"
+    assert ci_skill["source"] == "custom"
+
 
 @pytest.mark.asyncio
 async def test_slash_commands_dsh(tmp_path):
