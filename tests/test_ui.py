@@ -36,6 +36,26 @@ def test_command_completer():
     assert len(completions_mode_ag) == 1
     assert completions_mode_ag[0].text == "agent"
 
+    # Test /resume completion
+    completer_with_sessions = CommandCompleter(
+        get_models=lambda: [],
+        get_providers=lambda: [],
+        get_sessions=lambda: ["LATEST", "20260917-103000-abcd", "agy_conv-1234", "claude_proj-5678"],
+    )
+    doc_resume = Document("/resume ")
+    completions_resume = list(completer_with_sessions.get_completions(doc_resume, None))
+    assert [c.text for c in completions_resume] == [
+        "LATEST",
+        "20260917-103000-abcd",
+        "agy_conv-1234",
+        "claude_proj-5678",
+    ]
+
+    doc_resume_filter = Document("/resume agy")
+    completions_resume_filter = list(completer_with_sessions.get_completions(doc_resume_filter, None))
+    assert len(completions_resume_filter) == 1
+    assert completions_resume_filter[0].text == "agy_conv-1234"
+
 def test_terminal_ui_render():
     ui = TerminalUI(stream_markdown=True)
     # Ensure tables and banners format cleanly without exceptions

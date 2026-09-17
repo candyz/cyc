@@ -35,9 +35,11 @@ class CommandCompleter(Completer):
         self,
         get_models: Callable[[], List[str]],
         get_providers: Callable[[], List[str]],
+        get_sessions: Optional[Callable[[], List[str]]] = None,
     ):
         self.get_models = get_models
         self.get_providers = get_providers
+        self.get_sessions = get_sessions
         self.path_completer = PathCompleter(expanduser=True)
         self.commands = [
             "/help",
@@ -91,6 +93,11 @@ class CommandCompleter(Completer):
             for p in self.get_providers():
                 if p.lower().startswith(arg_prefix.lower()):
                     yield Completion(p, start_position=-len(arg_prefix))
+        elif cmd == "/resume":
+            if self.get_sessions:
+                for s in self.get_sessions():
+                    if s.lower().startswith(arg_prefix.lower()):
+                        yield Completion(s, start_position=-len(arg_prefix))
         elif cmd in ("/save", "/load"):
             # Delegate to PathCompleter with modified document
             sub_doc = Document(arg_prefix, cursor_position=len(arg_prefix))
@@ -224,6 +231,7 @@ def create_prompt_session(
     history_file: Optional[Path] = None,
     get_models: Optional[Callable[[], List[str]]] = None,
     get_providers: Optional[Callable[[], List[str]]] = None,
+    get_sessions: Optional[Callable[[], List[str]]] = None,
     multiline: bool = False,
     bottom_toolbar: Optional[Callable[[], AnyFormattedText]] = None,
 ) -> PromptSession:
@@ -237,7 +245,11 @@ def create_prompt_session(
 
     completer = None
     if get_models and get_providers:
-        completer = CommandCompleter(get_models=get_models, get_providers=get_providers)
+        completer = CommandCompleter(
+            get_models=get_models,
+            get_providers=get_providers,
+            get_sessions=get_sessions,
+        )
 
     kb = KeyBindings()
 

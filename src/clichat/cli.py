@@ -87,6 +87,22 @@ class CliApp:
     def get_known_providers(self) -> List[str]:
         return list(self.config.providers.keys())
 
+    def get_known_sessions(self) -> List[str]:
+        """Collect all known session IDs for tab completion."""
+        session_ids = ["LATEST"]
+        try:
+            for s in SessionManager.list_sessions():
+                session_ids.append(s["id"])
+            for s in SessionAdapters.list_agy_sessions():
+                session_ids.append(s["id"])
+            for s in SessionAdapters.list_claude_sessions():
+                session_ids.append(s["id"])
+            for s in SessionAdapters.list_pi_sessions():
+                session_ids.append(s["id"])
+        except Exception:
+            pass
+        return session_ids
+
     async def update_cached_models(self) -> None:
         try:
             models = await self.provider.list_models()
@@ -149,22 +165,22 @@ class CliApp:
             return True
         elif action == "/help":
             console.print(r"""[bold cyan]Available Commands:[/bold cyan]
-  /help               Show this help message
-  /mode \[chat|agent] Switch or inspect interaction mode (chat or agent)
-  /tools              List registered agent tools and descriptions
-  /trust [show|allow|deny] Check or change current workspace trust status
-  /sessions           List all saved chat & agent sessions
-  /resume [id]        Resume a previous session (or latest if omitted)
-  /models             List available models for the active provider
-  /model <name>       Switch active model (tab-completion supported)
-  /provider <name>    Switch active provider (tab-completion supported)
-  /system <prompt>    Set or inspect system prompt
-  /tokens             Show context token usage statistics
-  /multiline          Toggle multi-line input mode
-  /save <filepath>    Save current conversation to Markdown (.md) or JSON (.json)
-  /load <filepath>    Load previous conversation from a JSON file
-  /clear              Clear current session history
-  /exit or /quit      Exit CLI""")
+  /help                     Show this help message
+  /mode \[chat|agent]        Switch or inspect interaction mode (chat or agent)
+  /tools                    List registered agent tools and descriptions
+  /trust \[show|allow|deny]  Check or change current workspace trust status
+  /sessions                 List all saved chat & agent sessions
+  /resume \[id]              Resume a previous session (or latest if omitted)
+  /models                   List available models for the active provider
+  /model <name>             Switch active model (tab-completion supported)
+  /provider <name>          Switch active provider (tab-completion supported)
+  /system <prompt>          Set or inspect system prompt
+  /tokens                   Show context token usage statistics
+  /multiline                Toggle multi-line input mode
+  /save <filepath>          Save current conversation to Markdown (.md) or JSON (.json)
+  /load <filepath>          Load previous conversation from a JSON file
+  /clear                    Clear current session history
+  /exit or /quit            Exit CLI""")
             return True
         elif action == "/sessions":
             # Support: /sessions [all|agy|claude|pi|clichat]
@@ -401,6 +417,7 @@ class CliApp:
                 history_file=HISTORY_FILE,
                 get_models=self.get_known_models,
                 get_providers=self.get_known_providers,
+                get_sessions=self.get_known_sessions,
                 multiline=self.multiline_mode,
                 bottom_toolbar=self._get_status_toolbar,
             )
