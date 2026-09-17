@@ -115,3 +115,32 @@ async def test_terminal_ui_stream_response():
     output = await ui.stream_response(fake_stream(), provider="test-prov", model="test-mod")
     assert output == "Hello World!"
 
+
+def test_terminal_ui_render_resumed_history():
+    ui = TerminalUI(stream_markdown=True)
+    # Empty messages should not raise
+    ui.render_resumed_history([])
+
+    sample_messages = [
+        {"role": "user", "content": "Can you check the files?"},
+        {
+            "role": "assistant",
+            "content": "I will inspect the workspace.",
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "list_dir", "arguments": '{"path": "."}'},
+                }
+            ],
+        },
+        {"role": "tool", "name": "list_dir", "content": "file1.txt\nfile2.py\nfile3.md"},
+        {"role": "assistant", "content": "I found 3 files in your repository."},
+    ]
+    ui.render_resumed_history(sample_messages)
+
+    # Test with more than max_messages to check truncation / slice indicator
+    many_messages = sample_messages * 4
+    ui.render_resumed_history(many_messages, max_messages=5)
+
+

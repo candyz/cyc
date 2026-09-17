@@ -231,6 +231,16 @@ async def test_slash_command_sessions_and_resume():
     handled = await app.handle_slash_command("/resume opencode non-existent-id")
     assert handled is True
 
+    # Test /resume with existing session
+    app.session.add_user_message("Previous question")
+    app.session.add_assistant_message("Previous response")
+    app.session.auto_save()
+    sess_id = app.session.session_id
+
+    handled = await app.handle_slash_command(f"/resume {sess_id}")
+    assert handled is True
+    assert len(app.session.messages) == 2
+
 
 @pytest.mark.asyncio
 async def test_slash_command_undo():

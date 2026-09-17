@@ -193,6 +193,57 @@ class TerminalUI:
         )
         self.console.print(Panel(body, title=title, border_style="cyan" if mode == "chat" else "magenta", box=ROUNDED))
 
+    def render_resumed_history(self, messages: List[Dict[str, Any]], max_messages: int = 10) -> None:
+        """Render previous conversation context when resuming a session so user can inspect past context."""
+        if not messages:
+            return
+
+        total_msgs = len(messages)
+        # Determine slice to display: if history is long, show the last max_messages with a note
+        if total_msgs > max_messages:
+            displayed = messages[-max_messages:]
+            skipped = total_msgs - max_messages
+            self.console.print(f"\n[dim]─── Showing last {max_messages} of {total_msgs} messages in history ({skipped} earlier messages hidden) ───[/dim]\n")
+        else:
+            displayed = messages
+            self.console.print(f"\n[dim]─── Session History Context ({total_msgs} message{'s' if total_msgs > 1 else ''}) ───[/dim]\n")
+
+        for msg in displayed:
+            role = msg.get("role", "unknown")
+            content = msg.get("content") or ""
+
+            if role == "user":
+                self.console.print(f"[bold cyan]User:[/bold cyan]\n{content.strip()}\n")
+            elif role == "assistant":
+                tool_calls = msg.get("tool_calls") or []
+                if content:
+                    self.console.print(f"[bold green]Assistant:[/bold green]")
+                    self.render_formatted_response(content.strip())
+                    self.console.print()
+                if tool_calls:
+                    for tc in tool_calls:
+                        func_info = tc.get("function", {})
+                        tc_name = func_info.get("name", "tool")
+                        tc_args = func_info.get("arguments", "")
+                        self.console.print(f"  [dim cyan]⚙ Tool Call: {tc_name}[/dim cyan] [dim]{tc_args}[/dim]")
+                    self.console.print()
+            elif role == "tool":
+                t_name = msg.get("name", "tool")
+                lines = content.strip().splitlines()
+                preview = lines[0] if lines else ""
+                if len(preview) > 100:
+                    preview = preview[:97] + "..."
+                if len(lines) > 1:
+                    preview += f" [dim]({len(lines)} lines)[/dim]"
+                self.console.print(f"  [dim green]✓ Observation ({t_name}): {preview}[/dim green]\n")
+            elif role == "system":
+                preview = content.strip().splitlines()[0] if content.strip() else ""
+                if len(preview) > 80:
+                    preview = preview[:77] + "..."
+                self.console.print(f"[dim]System: {preview}[/dim]\n")
+
+        self.console.print("[dim]────────────────────────────────────────────────────────────[/dim]\n")
+
     def print_sessions_table(self, sessions: List[Dict]):
         table = Table(title=f"Chat & Agent Sessions ({len(sessions)})", box=ROUNDED)
         table.add_column("Agent / Source", style="bold yellow", justify="center")

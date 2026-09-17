@@ -401,6 +401,8 @@ class CliApp:
                 self.agent_loop.model = self.model
 
             console.print(f"[bold green]Resumed session:[/bold green] {self.session.session_id} ([cyan]{len(self.session.messages)} messages[/cyan], mode: [magenta]{self.mode}[/magenta])")
+            if self.session.messages:
+                self.ui.render_resumed_history(self.session.messages)
             return True
         elif action == "/mode":
             if not arg:
@@ -649,6 +651,8 @@ class CliApp:
                     try:
                         self.session = SessionManager.load_json(in_path)
                         console.print(f"[bold green]Loaded {len(self.session.messages)} messages from {in_path}[/bold green]")
+                        if self.session.messages:
+                            self.ui.render_resumed_history(self.session.messages)
                     except Exception as e:
                         console.print(f"[bold red]Failed to load session:[/bold red] {e}")
             return True
@@ -988,6 +992,8 @@ async def async_main():
 
     if resumed_session:
         console.print(f"[bold green]Resumed session:[/bold green] {resumed_session.session_id} ([cyan]{len(resumed_session.messages)} messages[/cyan], mode: [magenta]{mode}[/magenta])")
+        if resumed_session.messages:
+            app.ui.render_resumed_history(resumed_session.messages)
 
     piped_input = ""
     if not sys.stdin.isatty():
