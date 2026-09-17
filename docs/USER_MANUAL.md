@@ -194,12 +194,12 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `/sessions <source>` | 列出所有已儲存會話（支援 `all`, `clichat`, `agy`, `claude`, `pi`, `opencode`） |
 | `/resume <id>` | 接續現有會話或跨工具匯入歷史對話 |
 | `/fork <id>` | 將目前會話分岔出獨立分支並立即切換 |
-| `/sync [agent]` | 雙向寫回外部代理（支援 `agy`, `claude`, `pi`, `opencode`，自動或手動指定，原工具可接續開發） |
+| `/sync <agent>` | 雙向寫回外部代理（支援 `agy`, `claude`, `pi`, `opencode`，自動或手動指定，原工具可接續開發） |
 | `/models` | 表格化列出當前 Provider 所有可用模型清單 |
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
 | `/system <prompt>` | 設定或檢視當前 System Prompt |
-| `/tokens` | 表格化顯示當前上下文視窗的 Token 佔比與利用率 |
+| `/context` | 表格化顯示當前上下文視窗的 Token 佔比與利用率 |
 | `/usage` | 檢視 Token 累積消耗、模型訂閱狀態與 Rate Limit 限額資訊 |
 | `/multiline` | 切換單行 / 多行輸入模式（多行模式按 `Esc+Enter` 送出） |
 | `/save <filepath>` | 儲存會話（`.md` 存為 Markdown，`.json` 存為結構化會話） |
