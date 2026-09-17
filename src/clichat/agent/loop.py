@@ -21,6 +21,7 @@ class AgentLoop:
         tool_registry: Optional[ToolRegistry] = None,
         permission_manager: Optional[PermissionManager] = None,
         max_turns: int = 15,
+        ui: Optional[Any] = None,
     ):
         self.provider = provider
         self.model = model
@@ -28,6 +29,7 @@ class AgentLoop:
         self.tool_registry = tool_registry or ToolRegistry()
         self.permission_manager = permission_manager or PermissionManager()
         self.max_turns = max_turns
+        self.ui = ui
 
     def _render_tool_call_card(self, tool_name: str, args: Dict[str, Any]):
         args_formatted = json.dumps(args, ensure_ascii=False, indent=2)
@@ -94,7 +96,10 @@ class AgentLoop:
                 })
 
                 if response.content:
-                    console.print(Markdown(response.content))
+                    if self.ui and hasattr(self.ui, "render_formatted_response"):
+                        self.ui.render_formatted_response(response.content)
+                    else:
+                        console.print(Markdown(response.content))
 
                 for tc in response.tool_calls:
                     self._render_tool_call_card(tc.name, tc.arguments)
@@ -126,7 +131,10 @@ class AgentLoop:
             # Model did not call any tools -> final answer reached
             final_content = response.content or ""
             if final_content:
-                console.print(Markdown(final_content))
+                if self.ui and hasattr(self.ui, "render_formatted_response"):
+                    self.ui.render_formatted_response(final_content)
+                else:
+                    console.print(Markdown(final_content))
                 self.session.add_assistant_message(final_content)
             break
 

@@ -100,3 +100,31 @@ def test_session_auto_save_and_resume(tmp_path: Path):
     found = SessionManager.find_session("test_sess", sessions_dir=sessions_dir)
     assert found is not None
     assert found.session_id == "test_sess_01"
+
+def test_session_undo():
+    session = SessionManager()
+    assert session.undo_turn() is False
+
+    # Turn 1
+    session.add_user_message("Hello")
+    session.add_assistant_message("Hi there!")
+    assert len(session.messages) == 2
+
+    # Turn 2
+    session.add_user_message("Write a script")
+    session.add_assistant_message("Here is the script...")
+    assert len(session.messages) == 4
+
+    # Undo Turn 2
+    res = session.undo_turn()
+    assert res is True
+    assert len(session.messages) == 2
+    assert session.messages[-1]["content"] == "Hi there!"
+
+    # Undo Turn 1
+    res = session.undo_turn()
+    assert res is True
+    assert len(session.messages) == 0
+
+    # Undo again when empty
+    assert session.undo_turn() is False

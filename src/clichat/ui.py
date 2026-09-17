@@ -56,6 +56,7 @@ class CommandCompleter(Completer):
             "/multiline",
             "/save",
             "/load",
+            "/undo",
             "/clear",
             "/exit",
             "/quit",
@@ -239,6 +240,26 @@ class TerminalUI:
         table.add_row("Context Utilization", f"{percentage:.1f}%")
         self.console.print(table)
 
+    def render_formatted_response(self, text: str) -> None:
+        """Render response text with separate styled panel for <think>...</think> blocks."""
+        import re
+        think_pattern = re.compile(r"<think>(.*?)</think>", re.DOTALL)
+        match = think_pattern.search(text)
+        if match:
+            thinking_content = match.group(1).strip()
+            rest_content = think_pattern.sub("", text).strip()
+            if thinking_content:
+                self.console.print(Panel(
+                    f"[dim]{thinking_content}[/dim]",
+                    title="[bold magenta]💭 Thinking Process[/bold magenta]",
+                    border_style="magenta",
+                    expand=False,
+                ))
+            if rest_content:
+                self.console.print(Markdown(rest_content))
+        else:
+            self.console.print(Markdown(text))
+
     async def stream_response(
         self,
         stream_gen: AsyncGenerator[str, None],
@@ -246,6 +267,7 @@ class TerminalUI:
         model: str,
     ) -> str:
         """Stream model response to terminal with optional Live Markdown rendering.
+        Detects <think>...</think> thinking blocks and separates them into styled panels.
         Handles KeyboardInterrupt (Ctrl+C) gracefully.
         """
         self.console.print(f"[bold cyan]{provider} ({model})[/bold cyan] > ", end="")
@@ -270,8 +292,24 @@ class TerminalUI:
             with Live(Markdown(""), console=self.console, refresh_per_second=12, transient=False) as live:
                 async for chunk in stream_gen:
                     full_text += chunk
-                    live.update(Markdown(full_text))
-            self.console.print()
+                    # During streaming, if <think> tags are present, show a thinking indicator or styled text
+                    if "<think>" in full_text and "</think>" not in full_text:
+                        think_part = full_text.split("<think>", 1)[1]
+                        live.update(Markdown(f"> *Thinking...*\n\n```thinking\n{think_part}\n```"))
+                    elif "<think>" in full_text and "</think>" in full_text:
+                        parts = full_text.split("</think>", 1)
+                        content_part = parts[1].strip()
+                        live.update(Markdown(content_part or "> *Thinking complete. Formulating response...*"))
+                    else:
+                        live.update(Markdown(full_text))
+
+            # After live streaming completes, if <think> tags were present, re-render cleanly
+            if "<think>" in full_text:
+                self.console.clear()
+                self.console.print(f"[bold cyan]{provider} ({model})[/bold cyan] > ")
+                self.render_formatted_response(full_text)
+            else:
+                self.console.print()
         except (asyncio.CancelledError, KeyboardInterrupt):
             self.console.print("\n[dim yellow](Interrupted by user)[/dim yellow]\n")
 

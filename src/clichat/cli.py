@@ -76,6 +76,7 @@ class CliApp:
             session=self.session,
             tool_registry=self.tool_registry,
             permission_manager=self.permission_manager,
+            ui=self.ui,
         )
 
         if self.mode == "agent" and not self.session.system_prompt:
@@ -188,6 +189,7 @@ class CliApp:
   /multiline                Toggle multi-line input mode
   /save <filepath>          Save current conversation to Markdown (.md) or JSON (.json)
   /load <filepath>          Load previous conversation from a JSON file
+  /undo                     Undo last turn's changes and conversation
   /clear                    Clear current session history
   /exit or /quit            Exit CLI""")
             return True
@@ -448,6 +450,33 @@ class CliApp:
                         console.print(f"[bold green]Loaded {len(self.session.messages)} messages from {in_path}[/bold green]")
                     except Exception as e:
                         console.print(f"[bold red]Failed to load session:[/bold red] {e}")
+            return True
+        elif action == "/undo":
+            success = self.session.undo_turn()
+            if not success:
+                console.print("[yellow]Nothing to undo (no previous turns in this session).[/yellow]")
+                return True
+
+            console.print(f"[bold green]✓ Undid last conversation turn.[/bold green] ({len(self.session.messages)} messages remaining)")
+
+            # If inside a git repository, ask user if they want to discard uncommitted file modifications
+            try:
+                git_status = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=str(self.workspace_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                if git_status.returncode == 0 and git_status.stdout.strip():
+                    console.print("[dim yellow]Detected uncommitted changes in workspace after turn.[/dim yellow]")
+                    choice = input("Would you like to discard uncommitted git changes as well? (git restore .) [y/N]: ").strip().lower()
+                    if choice in ("y", "yes"):
+                        subprocess.run(["git", "restore", "."], cwd=str(self.workspace_path), timeout=5)
+                        console.print("[bold green]✓ Workspace changes discarded (git restore .).[/bold green]")
+            except Exception:
+                pass
+
             return True
         return False
 

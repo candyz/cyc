@@ -225,3 +225,23 @@ async def test_slash_command_sessions_and_resume():
     handled = await app.handle_slash_command("/resume opencode non-existent-id")
     assert handled is True
 
+
+@pytest.mark.asyncio
+async def test_slash_command_undo():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+
+    # Undo on empty session
+    handled = await app.handle_slash_command("/undo")
+    assert handled is True
+
+    # Add messages
+    app.session.add_user_message("Query 1")
+    app.session.add_assistant_message("Answer 1")
+    assert len(app.session.messages) == 2
+
+    # Undo
+    handled = await app.handle_slash_command("/undo")
+    assert handled is True
+    assert len(app.session.messages) == 0
+

@@ -43,12 +43,20 @@ class SessionManager:
         self.messages: List[Dict] = []
         self.created_at = time.time()
         self.updated_at = time.time()
+        self.history_checkpoints: List[List[Dict]] = []
 
     def set_system_prompt(self, prompt: Optional[str]) -> None:
         self.system_prompt = prompt
         self.auto_save()
 
     def add_user_message(self, content: str) -> None:
+        # Save snapshot of messages before starting a new user interaction turn
+        import copy
+        self.history_checkpoints.append(copy.deepcopy(self.messages))
+        # Keep maximum 20 undo checkpoints in memory
+        if len(self.history_checkpoints) > 20:
+            self.history_checkpoints.pop(0)
+
         self.messages.append({"role": "user", "content": content})
         self.updated_at = time.time()
         self._prune_context_if_needed()
@@ -60,8 +68,35 @@ class SessionManager:
         self._prune_context_if_needed()
         self.auto_save()
 
+    def undo_turn(self) -> bool:
+        """Roll back conversation messages to the state before the last user turn.
+        Returns True if rollback succeeded, False if no checkpoints available.
+        """
+        if not self.history_checkpoints:
+            # Fallback: if messages exist, try popping the last turn (e.g. user + assistant/tools)
+            if not self.messages:
+                return False
+            # Find the last user message and remove everything from there
+            last_user_idx = None
+            for idx in range(len(self.messages) - 1, -1, -1):
+                if self.messages[idx].get("role") == "user":
+                    last_user_idx = idx
+                    break
+            if last_user_idx is not None:
+                self.messages = self.messages[:last_user_idx]
+                self.updated_at = time.time()
+                self.auto_save()
+                return True
+            return False
+
+        self.messages = self.history_checkpoints.pop()
+        self.updated_at = time.time()
+        self.auto_save()
+        return True
+
     def clear(self) -> None:
         self.messages.clear()
+        self.history_checkpoints.clear()
         self.updated_at = time.time()
         self.auto_save()
 

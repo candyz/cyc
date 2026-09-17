@@ -94,3 +94,9 @@ def test_terminal_ui_render():
     ui.print_banner("ollama", "llama3.3", multiline=False)
     ui.print_models_table(["llama3.3", "qwen2.5"], current_model="llama3.3", provider="ollama")
     ui.print_tokens_stats(tokens=120, limit=8192, msg_count=4)
+
+    # Test thinking / CoT block formatting
+    sample_cot_resp = "<think>\nLet's analyze the codebase and consider options.\n</think>\nHere is the answer."
+    ui.render_formatted_response(sample_cot_resp)
+    # Plain text without think
+    ui.render_formatted_response("Standard answer without thinking tags.")
