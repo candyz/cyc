@@ -37,7 +37,7 @@ class AgentLoop:
         args_formatted = json.dumps(args, ensure_ascii=False, indent=2)
         console.print(Panel(
             args_formatted,
-            title=f"[bold cyan]⚙️  Agent Tool Call: {tool_name}[/bold cyan]",
+            title=f"[bold cyan]Agent Tool Call: {tool_name}[/bold cyan]",
             border_style="cyan",
             expand=False,
         ))

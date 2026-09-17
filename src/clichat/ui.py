@@ -329,7 +329,7 @@ class TerminalUI:
             if thinking_content:
                 self.console.print(Panel(
                     f"[dim]{thinking_content}[/dim]",
-                    title="[bold magenta]💭 Thinking Process[/bold magenta]",
+                    title="[bold magenta]Thinking Process[/bold magenta]",
                     border_style="magenta",
                     expand=False,
                 ))

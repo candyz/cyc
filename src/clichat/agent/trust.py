@@ -73,7 +73,7 @@ class WorkspaceTrustManager:
         )
         console.print(Panel(
             body,
-            title="[bold yellow]🛡️  Workspace Trust Confirmation[/bold yellow]",
+            title="[bold yellow]Workspace Trust Confirmation[/bold yellow]",
             border_style="yellow",
             expand=False,
         ))
