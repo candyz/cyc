@@ -227,6 +227,7 @@ class CliApp:
   /sessions <source>        List all saved chat & agent sessions (all, clichat, agy, etc.)
   /resume <id>              Resume a previous session (or latest if omitted)
   /fork <id>                Fork current session into a new branch
+  /sync <agent>             Sync session back to external agent (e.g. /sync agy)
   /models                   List available models for the active provider
   /model <name>             Switch active model (tab-completion supported)
   /provider <name>          Switch active provider (tab-completion supported)
@@ -404,6 +405,18 @@ class CliApp:
             self.session = forked_session
             self.agent_loop.session = forked_session
             console.print(f"[bold green]✓ Session forked into new branch:[/bold green] [bold cyan]{self.session.session_id}[/bold cyan] ({len(self.session.messages)} messages copied)")
+            return True
+        elif action == "/sync":
+            target_agent = arg.lower().strip() if arg else None
+            result = SessionAdapters.sync_session_back(self.session, target_agent=target_agent)
+            if result.get("success"):
+                synced_cnt = result.get("synced_count", 0)
+                conv_id = result.get("conv_id", "")
+                console.print(f"[bold green]✓ {result.get('message')}[/bold green]")
+                if synced_cnt > 0:
+                    console.print(f"[dim]You can now resume in agy with: [cyan]agy --conversation {conv_id}[/cyan] (or [cyan]agy -c[/cyan])[/dim]")
+            else:
+                console.print(f"[bold red]Sync failed:[/bold red] {result.get('error', 'Unknown error')}")
             return True
         elif action == "/skills":
             skills = SkillManager.list_skills(self.workspace_path)

@@ -151,6 +151,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `/sessions <source>` | 列出所有已儲存會話（支援 `all`, `clichat`, `agy`, `claude`, `pi`, `opencode`） |
 | `/resume <id>` | 接續現有會話或跨工具匯入歷史對話 |
 | `/fork <id>` | 將目前會話分岔出獨立分支並立即切換 |
+| `/sync <agent>` | 雙向寫回外部代理（例如 `/sync agy`，使原工具亦可接續對話） |
 | `/models` | 表格化列出當前 Provider 所有可用模型清單 |
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |

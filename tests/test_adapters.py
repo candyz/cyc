@@ -250,3 +250,53 @@ def test_import_opencode_session(tmp_path: Path):
     assert "tool_calls" in imported.messages[1]
     assert imported.messages[2]["role"] == "tool"
     assert imported.messages[2]["content"] == "content_a"
+
+
+def test_export_and_sync_back_to_agy(tmp_path: Path):
+    brain_dir = tmp_path / "brain"
+    conv_id = "test-sync-agy-uuid-5678"
+    log_dir = brain_dir / conv_id / ".system_generated" / "logs"
+    log_dir.mkdir(parents=True)
+    transcript_file = log_dir / "transcript.jsonl"
+
+    initial_records = [
+        {"step_index": 0, "source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "<USER_REQUEST>\nInitial question in agy\n</USER_REQUEST>"},
+        {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Initial answer from agy"},
+    ]
+    with open(transcript_file, "w", encoding="utf-8") as f:
+        for r in initial_records:
+            f.write(json.dumps(r) + "\n")
+
+    # 1. Import session into clichat
+    imported = SessionAdapters.import_agy_session("test-sync-agy", brain_dir=brain_dir)
+    assert imported is not None
+    assert imported.external_metadata["source_agent"] == "agy"
+    assert imported.external_metadata["source_id"] == conv_id
+    assert imported.external_metadata["base_message_count"] == 2
+
+    # 2. Add new user and assistant turns in clichat
+    imported.add_user_message("New question asked in clichat")
+    imported.add_assistant_message("New solution answered in clichat")
+
+    # 3. Sync session back to AGY
+    result = SessionAdapters.sync_session_back(imported)
+    assert result["success"] is True
+    assert result["synced_count"] == 2
+    assert result["conv_id"] == conv_id
+
+    # 4. Verify AGY transcript.jsonl was appended properly
+    lines = [json.loads(line) for line in transcript_file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(lines) == 4
+    # Check step indexes continuous
+    assert lines[2]["step_index"] == 2
+    assert lines[2]["type"] == "USER_INPUT"
+    assert "New question asked in clichat" in lines[2]["content"]
+    assert lines[3]["step_index"] == 3
+    assert lines[3]["type"] == "PLANNER_RESPONSE"
+    assert lines[3]["content"] == "New solution answered in clichat"
+
+    # 5. Calling sync again without new messages should report already up to date
+    res2 = SessionAdapters.sync_session_back(imported)
+    assert res2["success"] is True
+    assert res2["synced_count"] == 0
+

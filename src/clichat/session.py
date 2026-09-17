@@ -48,6 +48,9 @@ class SessionManager:
         # Cumulative token consumption tracking
         self.total_prompt_tokens: int = 0
         self.total_completion_tokens: int = 0
+        # External agent bridge metadata (source agent, original id, path, imported message count)
+        self.external_metadata: Dict = {}
+
 
 
     def append_event(self, event_type: str, data: Dict) -> None:
@@ -181,6 +184,7 @@ class SessionManager:
             "events": self.events,
             "total_prompt_tokens": self.total_prompt_tokens,
             "total_completion_tokens": self.total_completion_tokens,
+            "external_metadata": self.external_metadata,
             "estimated_tokens": self.total_estimated_tokens(),
         }
 
@@ -200,6 +204,7 @@ class SessionManager:
         manager.events = data.get("events", [])
         manager.total_prompt_tokens = data.get("total_prompt_tokens", 0)
         manager.total_completion_tokens = data.get("total_completion_tokens", 0)
+        manager.external_metadata = data.get("external_metadata", {})
         return manager
 
     def save_json(self, path: Path) -> None:

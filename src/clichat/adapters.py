@@ -9,7 +9,7 @@ import json
 import re
 import sqlite3
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from clichat.session import SessionManager
 
@@ -141,6 +141,12 @@ class SessionAdapters:
                             "content": content,
                         })
 
+        session.external_metadata = {
+            "source_agent": "agy",
+            "source_id": matched["id"],
+            "file_path": str(transcript_file),
+            "base_message_count": len(session.messages),
+        }
         session.auto_save()
         return session
 
@@ -263,6 +269,12 @@ class SessionAdapters:
                     if text_acc or tool_calls:
                         session.messages.append(msg_obj)
 
+        session.external_metadata = {
+            "source_agent": "claude",
+            "source_id": matched["id"],
+            "file_path": str(file_path),
+            "base_message_count": len(session.messages),
+        }
         session.auto_save()
         return session
 
@@ -390,6 +402,12 @@ class SessionAdapters:
                             "content": obs_acc,
                         })
 
+        session.external_metadata = {
+            "source_agent": "pi",
+            "source_id": matched["id"],
+            "file_path": str(file_path),
+            "base_message_count": len(session.messages),
+        }
         session.auto_save()
         return session
 
@@ -601,7 +619,181 @@ class SessionAdapters:
                             continue
 
             conn.close()
+            session.external_metadata = {
+                "source_agent": "opencode",
+                "source_id": matched["id"],
+                "file_path": str(target_db),
+                "base_message_count": len(session.messages),
+            }
             session.auto_save()
             return session
         except Exception:
             return None
+
+    # ------------------------------------------------------------------
+    # Two-Way Write-Back Bridge (Sync Back to External Agents)
+    # ------------------------------------------------------------------
+    @classmethod
+    def export_session_to_agy(
+        cls,
+        session: SessionManager,
+        target_conv_id: Optional[str] = None,
+        brain_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Write back newly generated messages in session to AGY transcript.jsonl.
+        Returns a status dictionary with success status and written lines count.
+        """
+        import datetime
+        target_dir = brain_dir or AGY_BRAIN_DIR
+
+        # Determine target agy conversation id
+        conv_id = target_conv_id
+        if not conv_id and session.external_metadata.get("source_agent") == "agy":
+            conv_id = session.external_metadata.get("source_id")
+
+        if not conv_id:
+            # Generate a new AGY conversation directory if none specified
+            import uuid
+            conv_id = str(uuid.uuid4())
+
+        # Determine transcript file path
+        if session.external_metadata.get("file_path") and Path(session.external_metadata["file_path"]).exists():
+            transcript_file = Path(session.external_metadata["file_path"])
+        else:
+            conv_folder = target_dir / conv_id
+            log_folder = conv_folder / ".system_generated" / "logs"
+            log_folder.mkdir(parents=True, exist_ok=True)
+            transcript_file = log_folder / "transcript.jsonl"
+
+        # Determine last step_index
+        last_step_index = -1
+        if transcript_file.exists():
+            try:
+                with open(transcript_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            data = json.loads(line)
+                            idx = data.get("step_index")
+                            if isinstance(idx, int) and idx > last_step_index:
+                                last_step_index = idx
+            except Exception:
+                pass
+
+        # Identify messages to write back
+        base_count = 0
+        if session.external_metadata.get("source_id") == conv_id:
+            base_count = session.external_metadata.get("base_message_count", 0)
+
+        new_messages = session.messages[base_count:]
+        if not new_messages:
+            return {
+                "success": True,
+                "synced_count": 0,
+                "conv_id": conv_id,
+                "transcript_file": str(transcript_file),
+                "message": "Already up to date (no new messages to sync back).",
+            }
+
+        written_count = 0
+        current_step = last_step_index + 1
+        now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        with open(transcript_file, "a", encoding="utf-8") as f:
+            for msg in new_messages:
+                role = msg.get("role")
+                content = msg.get("content", "")
+
+                if role == "user":
+                    entry = {
+                        "step_index": current_step,
+                        "source": "USER_EXPLICIT",
+                        "type": "USER_INPUT",
+                        "status": "DONE",
+                        "created_at": now_iso,
+                        "content": f"<USER_REQUEST>\n{content}\n</USER_REQUEST>",
+                    }
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                    current_step += 1
+                    written_count += 1
+
+                elif role == "assistant":
+                    tool_calls_raw = msg.get("tool_calls", [])
+                    agy_tc = []
+                    for tc in tool_calls_raw:
+                        fn = tc.get("function", {})
+                        t_name = fn.get("name", "tool")
+                        args = fn.get("arguments", {})
+                        if isinstance(args, str):
+                            try:
+                                args = json.loads(args)
+                            except Exception:
+                                pass
+                        agy_tc.append({"name": t_name, "args": args})
+
+                    entry = {
+                        "step_index": current_step,
+                        "source": "MODEL",
+                        "type": "PLANNER_RESPONSE",
+                        "status": "DONE",
+                        "created_at": now_iso,
+                    }
+                    if content:
+                        entry["content"] = content
+                    if agy_tc:
+                        entry["tool_calls"] = agy_tc
+
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                    current_step += 1
+                    written_count += 1
+
+                elif role == "tool":
+                    entry = {
+                        "step_index": current_step,
+                        "source": "MODEL",
+                        "type": "GENERIC",
+                        "status": "DONE",
+                        "created_at": now_iso,
+                        "content": str(content),
+                    }
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                    current_step += 1
+                    written_count += 1
+
+        # Update base_message_count so next sync won't duplicate
+        session.external_metadata["source_agent"] = "agy"
+        session.external_metadata["source_id"] = conv_id
+        session.external_metadata["file_path"] = str(transcript_file)
+        session.external_metadata["base_message_count"] = len(session.messages)
+        session.auto_save()
+
+        return {
+            "success": True,
+            "synced_count": written_count,
+            "conv_id": conv_id,
+            "transcript_file": str(transcript_file),
+            "message": f"Successfully synced {written_count} turns back to AGY conversation '{conv_id}'",
+        }
+
+    @classmethod
+    def sync_session_back(
+        cls,
+        session: SessionManager,
+        target_agent: Optional[str] = None,
+        brain_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Automatically detect or target external agent and write new conversation turns back."""
+        agent = (target_agent or session.external_metadata.get("source_agent") or "").lower()
+        if agent in ("agy", "antigravity"):
+            return cls.export_session_to_agy(session, brain_dir=brain_dir)
+        elif not agent:
+            return {
+                "success": False,
+                "error": "No source agent detected in session. Use '/sync agy' to specify target.",
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Two-way bridge currently supports 'agy' (Google Antigravity). '{agent}' is not supported yet.",
+            }
+

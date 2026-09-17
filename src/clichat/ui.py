@@ -52,6 +52,7 @@ class CommandCompleter(Completer):
             "/sessions",
             "/resume",
             "/fork",
+            "/sync",
             "/models",
             "/model",
             "/provider",
@@ -109,6 +110,10 @@ class CommandCompleter(Completer):
                         yield Completion(name, start_position=-len(arg_prefix))
             except Exception:
                 pass
+        elif cmd == "/sync":
+            for opt in ("agy",):
+                if opt.startswith(arg_prefix.lower()):
+                    yield Completion(opt, start_position=-len(arg_prefix))
         elif cmd == "/trust":
             for opt in ("show", "allow", "deny"):
                 if opt.startswith(arg_prefix.lower()):
