@@ -8,7 +8,7 @@ from clichat.agent.loop import AgentLoop
 from clichat.agent.skills import SkillManager
 from clichat.session import SessionManager
 from clichat.cli import CliApp
-from clichat.config import Config, ProviderConfig
+from clichat.config import Config, ProviderConfig, load_config
 from clichat.agent.permissions import PermissionManager, PermissionMode
 
 
@@ -234,4 +234,20 @@ async def test_provider_usage_info():
     opencode_prov = OpenCodeProvider()
     opencode_info = await opencode_prov.get_usage_info()
     assert "Zen Free" in opencode_info["provider"]
+
+
+def test_fixed_status_bar_scroll_region():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+
+    # In non-interactive or interactive environment, the context manager should safely execute without crashing
+    with app.fixed_status_bar_scroll_region():
+        pass
+
+    # Status line markup should produce valid markup with project name
+    markup = app._get_status_line_markup()
+    assert "Project:" in markup
+    assert "Context:" in markup
+    assert "ollama" in markup
+
 

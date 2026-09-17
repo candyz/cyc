@@ -1,5 +1,7 @@
 import argparse
 import asyncio
+from contextlib import contextmanager
+import shutil
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -713,8 +715,7 @@ class CliApp:
         )
         return HTML(status_text)
 
-    def print_status_bar(self) -> None:
-        """Render a standalone status line to terminal (e.g. after long agent turn scrolls)."""
+    def _get_status_line_markup(self) -> str:
         mode_badge = "[bold white on magenta] AGENT [/bold white on magenta]" if self.mode == "agent" else "[bold white on cyan] CHAT [/bold white on cyan]"
         ml_badge = "[magenta][Multi-line][/magenta]" if self.multiline_mode else "[dim][Single-line][/dim]"
 
@@ -730,7 +731,7 @@ class CliApp:
         token_str = f"{tokens}/{limit}"
         project_name = self.workspace_path.name or str(self.workspace_path)
 
-        console.print(
+        return (
             f"{mode_badge} "
             f"[bold]Project:[/bold] [bright_yellow]{project_name}[/bright_yellow] | "
             f"[bold]Provider:[/bold] [green]{self.provider_name}[/green] | "
@@ -739,6 +740,49 @@ class CliApp:
             f"{trust_badge} | "
             f"{ml_badge}"
         )
+
+    def print_status_bar(self) -> None:
+        """Render a standalone status line to terminal (e.g. after long agent turn scrolls)."""
+        console.print(self._get_status_line_markup())
+
+    @contextmanager
+    def fixed_status_bar_scroll_region(self):
+        """Reserve bottom line for fixed status bar and scroll upper region (lines 1..H-1)."""
+        is_tty = sys.stdout.isatty() and hasattr(sys.stdout, "write")
+        term_size = shutil.get_terminal_size()
+        lines, cols = term_size.lines, term_size.columns
+
+        if not is_tty or lines < 4:
+            yield
+            return
+
+        try:
+            from rich.text import Text
+
+            # 1. Restrict scroll region to top lines (1 to lines - 1)
+            sys.stdout.write(f"\033[1;{lines-1}r")
+
+            # 2. Render status line markup padded to full width
+            markup = " " + self._get_status_line_markup()
+            txt = Text.from_markup(markup)
+            if txt.cell_len < cols:
+                txt.pad_right(cols)
+            with console.capture() as cap:
+                console.print(txt, end="")
+            status_line = cap.get()
+
+            # 3. Draw status line on the last row and position cursor at line lines-1
+            sys.stdout.write(f"\033[{lines};1H{status_line}\033[{lines-1};1H\n")
+            sys.stdout.flush()
+
+            yield
+        finally:
+            try:
+                # Reset scrolling region to full screen
+                sys.stdout.write("\033[r")
+                sys.stdout.flush()
+            except Exception:
+                pass
 
     async def repl(self) -> None:
         self.ui.print_banner(self.provider_name, self.model, self.multiline_mode, mode=self.mode)
@@ -770,24 +814,24 @@ class CliApp:
 
                 if self.mode == "agent":
                     try:
-                        await self.agent_loop.run_turn(user_input)
+                        with self.fixed_status_bar_scroll_region():
+                            await self.agent_loop.run_turn(user_input)
                     except Exception as e:
                         console.print(f"\n[bold red]Agent Error:[/bold red] {e}\n")
-                    finally:
-                        self.print_status_bar()
                     continue
 
                 self.session.add_user_message(user_input)
 
                 try:
-                    stream_gen = self.provider.chat_stream(self.session.get_messages(), self.model)
-                    response_text = await self.ui.stream_response(
-                        stream_gen=stream_gen,
-                        provider=self.provider_name,
-                        model=self.model,
-                    )
-                    if response_text:
-                        self.session.add_assistant_message(response_text)
+                    with self.fixed_status_bar_scroll_region():
+                        stream_gen = self.provider.chat_stream(self.session.get_messages(), self.model)
+                        response_text = await self.ui.stream_response(
+                            stream_gen=stream_gen,
+                            provider=self.provider_name,
+                            model=self.model,
+                        )
+                        if response_text:
+                            self.session.add_assistant_message(response_text)
                 except Exception as e:
                     console.print(f"\n[bold red]API Error:[/bold red] {e}\n")
 
