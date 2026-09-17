@@ -11,3 +11,5 @@ wheels/
 
 # Pytest
 .pytest_cache/
+
+AGENTS.md
