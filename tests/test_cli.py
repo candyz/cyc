@@ -109,9 +109,7 @@ def test_status_toolbar():
     config = load_config(Path("/nonexistent"))
     app = CliApp(config, provider_name="ollama")
     toolbar_html = app._get_status_toolbar()
-    assert "Project:" in toolbar_html.value
     assert app.workspace_path.name in toolbar_html.value
-    assert "Provider:" in toolbar_html.value
     assert "ollama" in toolbar_html.value
     assert "Context:" in toolbar_html.value
     assert "(Type /help for commands)" not in toolbar_html.value
@@ -119,7 +117,7 @@ def test_status_toolbar():
     app.mode = "agent"
     toolbar_html_agent = app._get_status_toolbar()
     assert "AGENT" in toolbar_html_agent.value
-    assert "Project:" in toolbar_html_agent.value
+    assert app.workspace_path.name in toolbar_html_agent.value
 
 
 

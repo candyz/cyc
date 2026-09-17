@@ -560,7 +560,7 @@ class CliApp:
                 self.session.set_system_prompt(arg)
                 console.print(f"[bold green]System prompt updated:[/bold green] {arg}")
             return True
-        elif action in ("/context", "/tokens"):
+        elif action == "/context":
             if arg:
                 clean_arg = arg.replace(",", "").replace("_", "").lower()
                 multiplier = 1
@@ -706,10 +706,10 @@ class CliApp:
 
         status_text = (
             f" {mode_badge} "
-            f"<b>Project:</b> <style fg='ansibrightyellow'>{project_name}</style> | "
-            f"<b>Provider:</b> <style fg='ansigreen'>{self.provider_name}</style> | "
-            f"<b>Model:</b> <style fg='ansicyan'>{self.model}</style> | "
             f"<b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
+            f"<style fg='ansibrightyellow'>{project_name}</style> | "
+            f"<style fg='ansigreen'>{self.provider_name}</style> | "
+            f"<style fg='ansicyan'>{self.model}</style> | "
             f"{trust_badge} | "
             f"{ml_badge} "
         )
@@ -733,10 +733,10 @@ class CliApp:
 
         return (
             f"{mode_badge} "
-            f"[bold]Project:[/bold] [bright_yellow]{project_name}[/bright_yellow] | "
-            f"[bold]Provider:[/bold] [green]{self.provider_name}[/green] | "
-            f"[bold]Model:[/bold] [cyan]{self.model}[/cyan] | "
             f"[bold]Context:[/bold] [yellow]{token_str}[/yellow] | "
+            f"[bright_yellow]{project_name}[/bright_yellow] | "
+            f"[green]{self.provider_name}[/green] | "
+            f"[cyan]{self.model}[/cyan] | "
             f"{trust_badge} | "
             f"{ml_badge}"
         )

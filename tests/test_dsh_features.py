@@ -172,10 +172,10 @@ async def test_slash_commands_dsh(tmp_path):
     assert app.agent_loop.strategy == "plan"
     assert app.agent_loop.max_turns == 100
 
-    # Test /context and /tokens command
+    # Test /context command
     await app.handle_slash_command("/context 200k")
     assert app.session.max_context_tokens == 200_000
-    await app.handle_slash_command("/tokens 1m")
+    await app.handle_slash_command("/context 1m")
     assert app.session.max_context_tokens == 1_000_000
     await app.handle_slash_command("/context 64000")
     assert app.session.max_context_tokens == 64_000
@@ -244,10 +244,10 @@ def test_fixed_status_bar_scroll_region():
     with app.fixed_status_bar_scroll_region():
         pass
 
-    # Status line markup should produce valid markup with project name
+    # Status line markup should produce valid markup with project name and context
     markup = app._get_status_line_markup()
-    assert "Project:" in markup
     assert "Context:" in markup
     assert "ollama" in markup
+    assert app.workspace_path.name in markup
 
 

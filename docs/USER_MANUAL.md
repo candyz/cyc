@@ -122,7 +122,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
   - 輸入 `/compact` 隨時手動觸發上下文壓縮。
   - 支援指定壓縮目標比例（例如 `/compact 50%` 或 `/compact 0.4`）。
 - **動態上限調整 (`/context`)**：
-  - `/context`（或相容指令 `/tokens`）：顯示當前 Token 估算量、上下文視窗上限與利用率。
+  - `/context`：顯示當前 Token 估算量、上下文視窗上限與利用率。
   - `/context <limit>`：動態調整上限，支援 `k` / `m` 縮寫（例如 `/context 200k`、`/context 1m`、`/context 128000`）。
 
 
