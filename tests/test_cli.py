@@ -188,3 +188,21 @@ def test_parse_args_trust_flags():
     with patch.object(sys, "argv", ["clichat", "--no-trust"]):
         args = parse_args()
         assert args.no_trust is True
+
+
+def test_parse_args_completion():
+    with patch.object(sys, "argv", ["clichat", "--completion"]):
+        args = parse_args()
+        assert args.completion == "bash"
+
+    with patch.object(sys, "argv", ["clichat", "--completion", "zsh"]):
+        args = parse_args()
+        assert args.completion == "zsh"
+
+
+@pytest.mark.asyncio
+async def test_async_main_completion(capsys):
+    with patch.object(sys, "argv", ["clichat", "--completion", "bash"]):
+        await async_main()
+        captured = capsys.readouterr()
+        assert "complete -F _clichat_completion clichat" in captured.out

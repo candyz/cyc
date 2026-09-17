@@ -18,6 +18,7 @@ from clichat.agent import (
     build_coding_agent_system_prompt,
 )
 from clichat.adapters import SessionAdapters
+from clichat.completion import get_completion_script
 from clichat.config import Config, init_config_file, load_config
 from clichat.providers import create_provider
 from clichat.providers.base import BaseProvider
@@ -459,11 +460,18 @@ def parse_args():
     parser.add_argument("--sessions", action="store_true", help="List all saved chat & agent sessions and exit")
     parser.add_argument("--trust", action="store_true", default=None, help="Explicitly trust current workspace without prompting")
     parser.add_argument("--no-trust", action="store_true", default=None, help="Explicitly restrict current workspace (force Read-Only mode)")
+    parser.add_argument("--completion", nargs="?", const="bash", choices=["bash", "zsh"], help="Generate shell tab-completion script (bash or zsh)")
     return parser.parse_args()
 
 async def async_main():
     args = parse_args()
     config_path = Path(args.config) if args.config else None
+
+    # Handle '--completion'
+    if args.completion:
+        sys.stdout.write(get_completion_script(args.completion))
+        sys.stdout.flush()
+        return
 
     # Handle '--sessions'
     if args.sessions:
