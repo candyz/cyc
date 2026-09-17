@@ -94,6 +94,9 @@ clichat
 | `/clear` | 清空當前對話歷史 |
 | `/exit` 或 `/quit` | 退出對話 |
 
-## 規格書與規劃
+## 完整文件
 
-請參閱 [docs/CLI_CHAT_SPEC_AND_PLAN.md](docs/CLI_CHAT_SPEC_AND_PLAN.md)。
+- 📖 **[使用手冊 (User Manual)](docs/USER_MANUAL.md)**：完整說明對話模式、自主編程代理、PTC 腳本呼叫、Loop 策略、技能庫與 Slash 指令。
+- 🚀 **[部署與配置指南 (Deployment Guide)](docs/DEPLOYMENT_GUIDE.md)**：包含全域安裝、設定檔配置、Provider 認證、MCP 工具擴充與 Shell 自動補全設置。
+- 📋 **[架構與規劃書](docs/CLI_CHAT_SPEC_AND_PLAN.md)**：設計背景、技術架構與規格演進歷程。
+
