@@ -41,12 +41,21 @@ Core Operating Principles:
 4. Transparency: Explain your rationale clearly and concisely before calling tools.
 """
 
-    # Check for repository instruction files (GEMINI.md, CLAUDE.md, etc.)
-    for rule_file in ("GEMINI.md", "CLAUDE.md", ".cursorrules"):
+    # Check for repository instruction files (CLICHAT.md, AGENTS.md, GEMINI.md, CLAUDE.md, etc.)
+    rule_candidates = (
+        "CLICHAT.md",
+        "AGENTS.md",
+        ".gemini/GEMINI.md",
+        ".gemini/AGENTS.md",
+        "GEMINI.md",
+        "CLAUDE.md",
+        ".cursorrules",
+    )
+    for rule_file in rule_candidates:
         rule_path = cwd / rule_file
         if rule_path.exists() and rule_path.is_file():
             try:
-                rule_content = rule_path.read_text(encoding="utf-8")[:4000]
+                rule_content = rule_path.read_text(encoding="utf-8")[:8000]
                 base_prompt += f"\nProject Guidelines ({rule_file}):\n{rule_content}\n"
                 break
             except Exception:

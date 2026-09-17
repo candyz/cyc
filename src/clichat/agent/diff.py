@@ -28,10 +28,18 @@ def render_diff_panel(
     original_text: str,
     new_text: str,
     action_title: str = "File Modification Preview",
+    max_diff_lines: int = 200,
 ) -> None:
     """Render a colored unified diff panel to the terminal using Rich Syntax."""
     diff_str = generate_unified_diff(filepath, original_text, new_text)
     if not diff_str.strip():
         diff_str = "[No visible changes]"
+    else:
+        diff_lines = diff_str.splitlines()
+        if len(diff_lines) > max_diff_lines:
+            truncated_diff = diff_lines[:max_diff_lines]
+            truncated_diff.append(f"\n... [Diff truncated: {len(diff_lines) - max_diff_lines} more lines]")
+            diff_str = "\n".join(truncated_diff)
+
     syntax = Syntax(diff_str, "diff", theme="monokai", line_numbers=False)
-    console.print(Panel(syntax, title=f"[bold yellow]{action_title}[/bold yellow]: {filepath}", border_style="yellow"))
+    console.print(Panel(syntax, title=f"[bold yellow]{action_title}[/bold yellow]: [bold cyan]{filepath}[/bold cyan]", border_style="yellow"))

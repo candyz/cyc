@@ -87,18 +87,27 @@ class CliApp:
     def get_known_providers(self) -> List[str]:
         return list(self.config.providers.keys())
 
-    def get_known_sessions(self) -> List[str]:
-        """Collect all known session IDs for tab completion."""
-        session_ids = ["LATEST"]
+    def get_known_sessions(self, agent: Optional[str] = None) -> List[str]:
+        """Collect known session IDs for tab completion, optionally filtered by agent."""
+        session_ids = []
         try:
-            for s in SessionManager.list_sessions():
-                session_ids.append(s["id"])
-            for s in SessionAdapters.list_agy_sessions():
-                session_ids.append(s["id"])
-            for s in SessionAdapters.list_claude_sessions():
-                session_ids.append(s["id"])
-            for s in SessionAdapters.list_pi_sessions():
-                session_ids.append(s["id"])
+            filter_agent = agent.lower() if agent else None
+            if not filter_agent or filter_agent in ("all", "clichat"):
+                session_ids.append("LATEST")
+                for s in SessionManager.list_sessions():
+                    session_ids.append(s["id"])
+            if not filter_agent or filter_agent in ("all", "agy"):
+                for s in SessionAdapters.list_agy_sessions():
+                    session_ids.append(s["id"])
+            if not filter_agent or filter_agent in ("all", "claude"):
+                for s in SessionAdapters.list_claude_sessions():
+                    session_ids.append(s["id"])
+            if not filter_agent or filter_agent in ("all", "pi"):
+                for s in SessionAdapters.list_pi_sessions():
+                    session_ids.append(s["id"])
+            if not filter_agent or filter_agent in ("all", "opencode"):
+                for s in SessionAdapters.list_opencode_sessions():
+                    session_ids.append(s["id"])
         except Exception:
             pass
         return session_ids
@@ -183,7 +192,7 @@ class CliApp:
   /exit or /quit            Exit CLI""")
             return True
         elif action == "/sessions":
-            # Support: /sessions [all|agy|claude|pi|clichat]
+            # Support: /sessions [all|clichat|agy|claude|pi|opencode]
             filter_source = arg.lower() if arg else "all"
             sessions = []
             if filter_source in ("all", "clichat"):
@@ -194,12 +203,14 @@ class CliApp:
                 sessions.extend(SessionAdapters.list_claude_sessions())
             if filter_source in ("all", "pi"):
                 sessions.extend(SessionAdapters.list_pi_sessions())
+            if filter_source in ("all", "opencode"):
+                sessions.extend(SessionAdapters.list_opencode_sessions())
 
             sessions.sort(key=lambda s: s["updated_at"], reverse=True)
 
             if sessions:
                 self.ui.print_sessions_table(sessions)
-                console.print("[dim]Use '/resume <session_id>' (or --resume <id>) to resume or import from agy, claude, or pi.[/dim]")
+                console.print("[dim]Use '/resume [agent] <session_id>' (or --resume <id>) to resume or import from agy, claude, pi, or opencode.[/dim]")
             else:
                 console.print(f"[yellow]No saved sessions found for source '{filter_source}'.[/yellow]")
             return True
@@ -209,36 +220,96 @@ class CliApp:
                 # Resume latest clichat session
                 loaded_session = SessionManager.get_latest_session()
                 if not loaded_session:
-                    # Fallback to latest agy or claude if no clichat session
+                    # Fallback to latest external session if no clichat session
                     agy_list = SessionAdapters.list_agy_sessions()
                     if agy_list:
                         loaded_session = SessionAdapters.import_agy_session(agy_list[0]["id"])
                 if not loaded_session:
+                    opencode_list = SessionAdapters.list_opencode_sessions()
+                    if opencode_list:
+                        loaded_session = SessionAdapters.import_opencode_session(opencode_list[0]["id"])
+                if not loaded_session:
                     console.print("[yellow]No saved sessions available to resume.[/yellow]")
                     return True
             else:
-                target_query = arg
-                # Check clichat sessions first
-                loaded_session = SessionManager.find_session(target_query)
+                parts = arg.split(maxsplit=1)
+                agent_names = ("clichat", "agy", "claude", "pi", "opencode")
 
-                # Check agy if starts with agy_ or matches agy UUID
-                if not loaded_session:
-                    clean_query = target_query[4:] if target_query.startswith("agy_") else target_query
-                    loaded_session = SessionAdapters.import_agy_session(clean_query)
+                if len(parts) == 2 and parts[0].lower() in agent_names:
+                    target_agent = parts[0].lower()
+                    target_query = parts[1].strip()
 
-                # Check claude if starts with claude_ or matches claude ID
-                if not loaded_session:
-                    clean_query = target_query[7:] if target_query.startswith("claude_") else target_query
-                    loaded_session = SessionAdapters.import_claude_session(clean_query)
+                    if target_agent == "clichat":
+                        loaded_session = SessionManager.find_session(target_query)
+                    elif target_agent == "agy":
+                        clean_query = target_query[4:] if target_query.startswith("agy_") else target_query
+                        loaded_session = SessionAdapters.import_agy_session(clean_query)
+                    elif target_agent == "claude":
+                        clean_query = target_query[7:] if target_query.startswith("claude_") else target_query
+                        loaded_session = SessionAdapters.import_claude_session(clean_query)
+                    elif target_agent == "pi":
+                        clean_query = target_query[3:] if target_query.startswith("pi_") else target_query
+                        loaded_session = SessionAdapters.import_pi_session(clean_query)
+                    elif target_agent == "opencode":
+                        clean_query = target_query[9:] if target_query.startswith("opencode_") else target_query
+                        loaded_session = SessionAdapters.import_opencode_session(clean_query)
 
-                # Check pi if starts with pi_ or matches pi ID
-                if not loaded_session:
-                    clean_query = target_query[3:] if target_query.startswith("pi_") else target_query
-                    loaded_session = SessionAdapters.import_pi_session(clean_query)
+                    if not loaded_session:
+                        console.print(f"[bold red]Session not found in {target_agent}:[/bold red] {target_query}")
+                        return True
+                elif len(parts) == 1 and parts[0].lower() in agent_names:
+                    # User specified just the agent name e.g. "/resume agy" -> resume latest from that agent
+                    target_agent = parts[0].lower()
+                    if target_agent == "clichat":
+                        loaded_session = SessionManager.get_latest_session()
+                    elif target_agent == "agy":
+                        agy_list = SessionAdapters.list_agy_sessions()
+                        if agy_list:
+                            loaded_session = SessionAdapters.import_agy_session(agy_list[0]["id"])
+                    elif target_agent == "claude":
+                        claude_list = SessionAdapters.list_claude_sessions()
+                        if claude_list:
+                            loaded_session = SessionAdapters.import_claude_session(claude_list[0]["id"])
+                    elif target_agent == "pi":
+                        pi_list = SessionAdapters.list_pi_sessions()
+                        if pi_list:
+                            loaded_session = SessionAdapters.import_pi_session(pi_list[0]["id"])
+                    elif target_agent == "opencode":
+                        opencode_list = SessionAdapters.list_opencode_sessions()
+                        if opencode_list:
+                            loaded_session = SessionAdapters.import_opencode_session(opencode_list[0]["id"])
 
-                if not loaded_session:
-                    console.print(f"[bold red]Session not found in clichat, agy, claude, or pi:[/bold red] {target_query}")
-                    return True
+                    if not loaded_session:
+                        console.print(f"[yellow]No saved sessions found for agent '{target_agent}'.[/yellow]")
+                        return True
+                else:
+                    target_query = arg
+                    # Default: Check clichat sessions first
+                    loaded_session = SessionManager.find_session(target_query)
+
+                    # Check agy if starts with agy_ or matches agy UUID
+                    if not loaded_session:
+                        clean_query = target_query[4:] if target_query.startswith("agy_") else target_query
+                        loaded_session = SessionAdapters.import_agy_session(clean_query)
+
+                    # Check claude if starts with claude_ or matches claude ID
+                    if not loaded_session:
+                        clean_query = target_query[7:] if target_query.startswith("claude_") else target_query
+                        loaded_session = SessionAdapters.import_claude_session(clean_query)
+
+                    # Check pi if starts with pi_ or matches pi ID
+                    if not loaded_session:
+                        clean_query = target_query[3:] if target_query.startswith("pi_") else target_query
+                        loaded_session = SessionAdapters.import_pi_session(clean_query)
+
+                    # Check opencode if starts with opencode_ or matches opencode ID
+                    if not loaded_session:
+                        clean_query = target_query[9:] if target_query.startswith("opencode_") else target_query
+                        loaded_session = SessionAdapters.import_opencode_session(clean_query)
+
+                    if not loaded_session:
+                        console.print(f"[bold red]Session not found in clichat, agy, claude, pi, or opencode:[/bold red] {target_query}")
+                        return True
 
             self.session = loaded_session
             # Sync agent loop session
@@ -497,6 +568,7 @@ async def async_main():
         sessions.extend(SessionAdapters.list_agy_sessions())
         sessions.extend(SessionAdapters.list_claude_sessions())
         sessions.extend(SessionAdapters.list_pi_sessions())
+        sessions.extend(SessionAdapters.list_opencode_sessions())
         sessions.sort(key=lambda s: s["updated_at"], reverse=True)
 
         ui = TerminalUI()
@@ -533,26 +605,76 @@ async def async_main():
                 if agy_list:
                     resumed_session = SessionAdapters.import_agy_session(agy_list[0]["id"])
             if not resumed_session:
+                opencode_list = SessionAdapters.list_opencode_sessions()
+                if opencode_list:
+                    resumed_session = SessionAdapters.import_opencode_session(opencode_list[0]["id"])
+            if not resumed_session:
                 console.print("[yellow]No previous sessions found to resume. Starting new session.[/yellow]")
         else:
-            query = args.resume
-            # Try clichat
-            resumed_session = SessionManager.find_session(query)
-            # Try agy
-            if not resumed_session:
-                clean_q = query[4:] if query.startswith("agy_") else query
-                resumed_session = SessionAdapters.import_agy_session(clean_q)
-            # Try claude
-            if not resumed_session:
-                clean_q = query[7:] if query.startswith("claude_") else query
-                resumed_session = SessionAdapters.import_claude_session(clean_q)
-            # Try pi
-            if not resumed_session:
-                clean_q = query[3:] if query.startswith("pi_") else query
-                resumed_session = SessionAdapters.import_pi_session(clean_q)
+            parts = args.resume.split(maxsplit=1)
+            agent_names = ("clichat", "agy", "claude", "pi", "opencode")
+
+            if len(parts) == 2 and parts[0].lower() in agent_names:
+                target_agent = parts[0].lower()
+                target_query = parts[1].strip()
+
+                if target_agent == "clichat":
+                    resumed_session = SessionManager.find_session(target_query)
+                elif target_agent == "agy":
+                    clean_q = target_query[4:] if target_query.startswith("agy_") else target_query
+                    resumed_session = SessionAdapters.import_agy_session(clean_q)
+                elif target_agent == "claude":
+                    clean_q = target_query[7:] if target_query.startswith("claude_") else target_query
+                    resumed_session = SessionAdapters.import_claude_session(clean_q)
+                elif target_agent == "pi":
+                    clean_q = target_query[3:] if target_query.startswith("pi_") else target_query
+                    resumed_session = SessionAdapters.import_pi_session(clean_q)
+                elif target_agent == "opencode":
+                    clean_q = target_query[9:] if target_query.startswith("opencode_") else target_query
+                    resumed_session = SessionAdapters.import_opencode_session(clean_q)
+            elif len(parts) == 1 and parts[0].lower() in agent_names:
+                target_agent = parts[0].lower()
+                if target_agent == "clichat":
+                    resumed_session = SessionManager.get_latest_session()
+                elif target_agent == "agy":
+                    agy_list = SessionAdapters.list_agy_sessions()
+                    if agy_list:
+                        resumed_session = SessionAdapters.import_agy_session(agy_list[0]["id"])
+                elif target_agent == "claude":
+                    claude_list = SessionAdapters.list_claude_sessions()
+                    if claude_list:
+                        resumed_session = SessionAdapters.import_claude_session(claude_list[0]["id"])
+                elif target_agent == "pi":
+                    pi_list = SessionAdapters.list_pi_sessions()
+                    if pi_list:
+                        resumed_session = SessionAdapters.import_pi_session(pi_list[0]["id"])
+                elif target_agent == "opencode":
+                    opencode_list = SessionAdapters.list_opencode_sessions()
+                    if opencode_list:
+                        resumed_session = SessionAdapters.import_opencode_session(opencode_list[0]["id"])
+            else:
+                query = args.resume
+                # Try clichat
+                resumed_session = SessionManager.find_session(query)
+                # Try agy
+                if not resumed_session:
+                    clean_q = query[4:] if query.startswith("agy_") else query
+                    resumed_session = SessionAdapters.import_agy_session(clean_q)
+                # Try claude
+                if not resumed_session:
+                    clean_q = query[7:] if query.startswith("claude_") else query
+                    resumed_session = SessionAdapters.import_claude_session(clean_q)
+                # Try pi
+                if not resumed_session:
+                    clean_q = query[3:] if query.startswith("pi_") else query
+                    resumed_session = SessionAdapters.import_pi_session(clean_q)
+                # Try opencode
+                if not resumed_session:
+                    clean_q = query[9:] if query.startswith("opencode_") else query
+                    resumed_session = SessionAdapters.import_opencode_session(clean_q)
 
             if not resumed_session:
-                console.print(f"[bold red]Session not found in clichat, agy, claude, or pi:[/bold red] {query}. Starting new session.")
+                console.print(f"[bold red]Session not found in clichat, agy, claude, pi, or opencode:[/bold red] {args.resume}. Starting new session.")
 
     # Determine mode and permissions
     if resumed_session and resumed_session.mode and not args.agent:

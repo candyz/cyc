@@ -36,25 +36,57 @@ def test_command_completer():
     assert len(completions_mode_ag) == 1
     assert completions_mode_ag[0].text == "agent"
 
+    # Test /sessions completion
+    doc_sessions = Document("/sessions ")
+    completions_sessions = list(completer.get_completions(doc_sessions, None))
+    assert [c.text for c in completions_sessions] == ["all", "clichat", "agy", "claude", "pi", "opencode"]
+
+    doc_sessions_pi = Document("/sessions p")
+    completions_sessions_pi = list(completer.get_completions(doc_sessions_pi, None))
+    assert len(completions_sessions_pi) == 1
+    assert completions_sessions_pi[0].text == "pi"
+
     # Test /resume completion
+    def fake_get_sessions(agent=None):
+        data = {
+            "clichat": ["LATEST", "20260917-103000-abcd"],
+            "agy": ["agy_conv-1234"],
+            "claude": ["claude_proj-5678"],
+            "pi": ["pi_sess-9999"],
+            "opencode": ["ses_oc-1111"],
+        }
+        if agent and agent in data:
+            return data[agent]
+        all_s = []
+        for s_list in data.values():
+            all_s.extend(s_list)
+        return all_s
+
     completer_with_sessions = CommandCompleter(
         get_models=lambda: [],
         get_providers=lambda: [],
-        get_sessions=lambda: ["LATEST", "20260917-103000-abcd", "agy_conv-1234", "claude_proj-5678"],
+        get_sessions=fake_get_sessions,
     )
-    doc_resume = Document("/resume ")
-    completions_resume = list(completer_with_sessions.get_completions(doc_resume, None))
-    assert [c.text for c in completions_resume] == [
-        "LATEST",
-        "20260917-103000-abcd",
-        "agy_conv-1234",
-        "claude_proj-5678",
-    ]
 
-    doc_resume_filter = Document("/resume agy")
-    completions_resume_filter = list(completer_with_sessions.get_completions(doc_resume_filter, None))
-    assert len(completions_resume_filter) == 1
-    assert completions_resume_filter[0].text == "agy_conv-1234"
+    # 1. /resume [space] offers agent names + all session IDs
+    doc_resume = Document("/resume ")
+    completions_resume = [c.text for c in completer_with_sessions.get_completions(doc_resume, None)]
+    assert "agy" in completions_resume
+    assert "claude" in completions_resume
+    assert "pi" in completions_resume
+    assert "opencode" in completions_resume
+    assert "clichat" in completions_resume
+    assert "LATEST" in completions_resume
+
+    # 2. /resume agy [space] offers only agy sessions
+    doc_resume_agy = Document("/resume agy ")
+    completions_resume_agy = [c.text for c in completer_with_sessions.get_completions(doc_resume_agy, None)]
+    assert completions_resume_agy == ["agy_conv-1234"]
+
+    # 3. /resume opencode [space] offers only opencode sessions
+    doc_resume_oc = Document("/resume opencode ")
+    completions_resume_oc = [c.text for c in completer_with_sessions.get_completions(doc_resume_oc, None)]
+    assert completions_resume_oc == ["ses_oc-1111"]
 
 def test_terminal_ui_render():
     ui = TerminalUI(stream_markdown=True)

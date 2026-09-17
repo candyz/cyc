@@ -35,11 +35,11 @@ class CommandCompleter(Completer):
         self,
         get_models: Callable[[], List[str]],
         get_providers: Callable[[], List[str]],
-        get_sessions: Optional[Callable[[], List[str]]] = None,
+        get_sessions: Optional[Callable[[Optional[str]], List[str]]] = None,
     ):
         self.get_models = get_models
         self.get_providers = get_providers
-        self.get_sessions = get_sessions
+        self._get_sessions_fn = get_sessions
         self.path_completer = PathCompleter(expanduser=True)
         self.commands = [
             "/help",
@@ -60,6 +60,15 @@ class CommandCompleter(Completer):
             "/exit",
             "/quit",
         ]
+
+    def get_sessions(self, agent: Optional[str] = None) -> List[str]:
+        if not self._get_sessions_fn:
+            return []
+        import inspect
+        sig = inspect.signature(self._get_sessions_fn)
+        if len(sig.parameters) >= 1:
+            return self._get_sessions_fn(agent)
+        return self._get_sessions_fn()
 
     def get_completions(self, document: Document, complete_event: CompleteEvent):
         text_before_cursor = document.text_before_cursor
@@ -93,11 +102,50 @@ class CommandCompleter(Completer):
             for p in self.get_providers():
                 if p.lower().startswith(arg_prefix.lower()):
                     yield Completion(p, start_position=-len(arg_prefix))
+        elif cmd == "/sessions":
+            # Tab completion for sources: all, clichat, agy, claude, pi, opencode
+            sources = ["all", "clichat", "agy", "claude", "pi", "opencode"]
+            for s in sources:
+                if s.startswith(arg_prefix.lower()):
+                    yield Completion(s, start_position=-len(arg_prefix))
         elif cmd == "/resume":
             if self.get_sessions:
-                for s in self.get_sessions():
-                    if s.lower().startswith(arg_prefix.lower()):
-                        yield Completion(s, start_position=-len(arg_prefix))
+                # Check if user has typed an agent prefix, e.g. "/resume agy "
+                resume_parts = arg_prefix.split(maxsplit=1)
+                agent_names = ["clichat", "agy", "claude", "pi", "opencode"]
+
+                if not resume_parts:
+                    # User typed "/resume " with no text yet
+                    for an in agent_names:
+                        yield Completion(an, start_position=0)
+                    for s in self.get_sessions(None):
+                        yield Completion(s, start_position=0)
+                elif len(resume_parts) == 1 and not arg_prefix.endswith(" "):
+                    # Still typing the first argument: could be an agent name or a session ID / LATEST
+                    first_tok = resume_parts[0].lower()
+                    # First yield matching agent names
+                    for an in agent_names:
+                        if an.startswith(first_tok):
+                            yield Completion(an, start_position=-len(first_tok))
+                    # Also yield matching session IDs directly
+                    for s in self.get_sessions(None):
+                        if s.lower().startswith(first_tok):
+                            yield Completion(s, start_position=-len(first_tok))
+                else:
+                    # User specified first argument and pressed space, or is typing session id for that agent
+                    target_agent = resume_parts[0].lower()
+                    session_query = resume_parts[1] if len(resume_parts) > 1 else ""
+
+                    if target_agent in agent_names:
+                        filter_agent = None if target_agent == "all" else target_agent
+                        for s in self.get_sessions(filter_agent):
+                            if s.lower().startswith(session_query.lower()):
+                                yield Completion(s, start_position=-len(session_query))
+                    else:
+                        # First argument was not a recognized agent name, fallback to all sessions
+                        for s in self.get_sessions(None):
+                            if s.lower().startswith(arg_prefix.lower()):
+                                yield Completion(s, start_position=-len(arg_prefix))
         elif cmd in ("/save", "/load"):
             # Delegate to PathCompleter with modified document
             sub_doc = Document(arg_prefix, cursor_position=len(arg_prefix))
@@ -143,6 +191,8 @@ class TerminalUI:
                 agent_col = "[bold magenta]CLAUDE[/bold magenta]"
             elif agent_source == "PI":
                 agent_col = "[bold yellow]PI[/bold yellow]"
+            elif agent_source == "OPENCODE":
+                agent_col = "[bold blue]OPENCODE[/bold blue]"
             else:
                 agent_col = "[bold green]CLICHAT[/bold green]"
 

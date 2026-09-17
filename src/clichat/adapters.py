@@ -2,10 +2,12 @@
 - agy (Antigravity): ~/.gemini/antigravity-cli/brain/<uuid>/.system_generated/logs/transcript.jsonl
 - claude (Claude Code): ~/.claude/projects/*/*.jsonl
 - pi (Pi Agent): ~/.pi/agent/sessions/*/*.jsonl
+- opencode (OpenCode): ~/.local/share/opencode/opencode.db
 """
 
 import json
 import re
+import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -14,10 +16,11 @@ from clichat.session import SessionManager
 AGY_BRAIN_DIR = Path.home() / ".gemini" / "antigravity-cli" / "brain"
 CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 PI_SESSIONS_DIR = Path.home() / ".pi" / "agent" / "sessions"
+OPENCODE_DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 
 
 class SessionAdapters:
-    """Helper class to discover and import sessions from agy, claude, and pi."""
+    """Helper class to discover and import sessions from agy, claude, pi, and opencode."""
 
     # ------------------------------------------------------------------
     # AGY (Google Antigravity) Adapter
@@ -389,3 +392,216 @@ class SessionAdapters:
 
         session.auto_save()
         return session
+
+    # ------------------------------------------------------------------
+    # OpenCode Adapter
+    # ------------------------------------------------------------------
+    @classmethod
+    def list_opencode_sessions(cls, db_path: Optional[Path] = None) -> List[Dict]:
+        target_db = db_path or OPENCODE_DB_PATH
+        if not target_db.exists():
+            return []
+
+        results = []
+        try:
+            conn = sqlite3.connect(f"file:{target_db}?mode=ro", uri=True)
+            cursor = conn.cursor()
+
+            query = """
+            SELECT
+                s.id,
+                s.title,
+                s.time_updated,
+                s.directory,
+                s.agent,
+                s.model,
+                (
+                    SELECT p.data
+                    FROM message m
+                    JOIN part p ON m.id = p.message_id
+                    WHERE m.session_id = s.id
+                      AND json_extract(m.data, '$.role') = 'user'
+                      AND json_extract(p.data, '$.type') = 'text'
+                    ORDER BY m.time_created ASC, p.time_created ASC
+                    LIMIT 1
+                ) AS first_user_part,
+                (
+                    SELECT COUNT(m.id)
+                    FROM message m
+                    WHERE m.session_id = s.id
+                      AND json_extract(m.data, '$.role') = 'user'
+                ) AS user_msg_count
+            FROM session s
+            ORDER BY s.time_updated DESC;
+            """
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+            for row in rows:
+                sid, title, time_updated, directory, agent, model_raw, first_user_part_raw, user_msg_count = row
+                preview = ""
+                if first_user_part_raw:
+                    try:
+                        part_obj = json.loads(first_user_part_raw)
+                        clean_text = part_obj.get("text", "").replace("\n", " ").strip()
+                        if len(clean_text) > 60:
+                            clean_text = clean_text[:57] + "..."
+                        preview = clean_text
+                    except Exception:
+                        pass
+
+                if not preview and title and not title.startswith("New session -"):
+                    preview = title
+
+                # Model info extraction
+                model_name = ""
+                if model_raw:
+                    try:
+                        m_info = json.loads(model_raw)
+                        model_name = m_info.get("id") or m_info.get("modelID") or ""
+                    except Exception:
+                        model_name = str(model_raw)
+
+                # time_updated in opencode is in milliseconds
+                updated_sec = (time_updated / 1000.0) if time_updated else 0
+
+                results.append({
+                    "agent": "opencode",
+                    "id": sid,
+                    "title": title or "",
+                    "model": model_name,
+                    "provider": "opencode",
+                    "mode": "agent",
+                    "updated_at": updated_sec,
+                    "message_count": user_msg_count or 0,
+                    "preview": preview or "(no user prompt)",
+                })
+
+            conn.close()
+        except Exception:
+            return []
+
+        return results
+
+    @classmethod
+    def import_opencode_session(cls, query: str, db_path: Optional[Path] = None) -> Optional[SessionManager]:
+        target_db = db_path or OPENCODE_DB_PATH
+        if not target_db.exists():
+            return None
+
+        sessions = cls.list_opencode_sessions(db_path=target_db)
+        matched = None
+        for s in sessions:
+            if s["id"] == query or s["id"].startswith(query):
+                matched = s
+                break
+
+        if not matched:
+            return None
+
+        session_id = matched["id"]
+        session = SessionManager(
+            session_id=f"opencode_{session_id[:12]}",
+            provider="opencode",
+            model=matched.get("model") or None,
+            mode="agent",
+        )
+
+        try:
+            conn = sqlite3.connect(f"file:{target_db}?mode=ro", uri=True)
+            cursor = conn.cursor()
+
+            # Retrieve messages in order
+            msg_query = """
+            SELECT id, data
+            FROM message
+            WHERE session_id = ?
+            ORDER BY time_created ASC;
+            """
+            cursor.execute(msg_query, (session_id,))
+            messages = cursor.fetchall()
+
+            for msg_id, msg_data_raw in messages:
+                try:
+                    msg_meta = json.loads(msg_data_raw)
+                except Exception:
+                    continue
+
+                role = msg_meta.get("role")
+
+                # Get all parts for this message
+                part_query = """
+                SELECT data
+                FROM part
+                WHERE message_id = ?
+                ORDER BY time_created ASC;
+                """
+                cursor.execute(part_query, (msg_id,))
+                parts = cursor.fetchall()
+
+                if role == "user":
+                    user_text = ""
+                    for (part_raw,) in parts:
+                        try:
+                            p_data = json.loads(part_raw)
+                            if p_data.get("type") == "text":
+                                user_text += p_data.get("text", "")
+                        except Exception:
+                            continue
+                    if user_text:
+                        session.messages.append({"role": "user", "content": user_text})
+
+                elif role == "assistant":
+                    asst_text = ""
+                    tool_calls = []
+                    for (part_raw,) in parts:
+                        try:
+                            p_data = json.loads(part_raw)
+                            ptype = p_data.get("type")
+                            if ptype == "text":
+                                asst_text += p_data.get("text", "")
+                            elif ptype == "tool":
+                                call_id = p_data.get("callID") or f"call_{len(tool_calls)}"
+                                tool_name = p_data.get("tool", "unknown_tool")
+                                state = p_data.get("state") or {}
+                                input_args = state.get("input") or {}
+                                tool_calls.append({
+                                    "id": call_id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool_name,
+                                        "arguments": json.dumps(input_args, ensure_ascii=False) if isinstance(input_args, dict) else str(input_args),
+                                    },
+                                })
+                        except Exception:
+                            continue
+
+                    msg_obj = {"role": "assistant", "content": asst_text}
+                    if tool_calls:
+                        msg_obj["tool_calls"] = tool_calls
+                    if asst_text or tool_calls:
+                        session.messages.append(msg_obj)
+
+                    # Also append tool observation messages from completed tools
+                    for (part_raw,) in parts:
+                        try:
+                            p_data = json.loads(part_raw)
+                            if p_data.get("type") == "tool":
+                                call_id = p_data.get("callID") or "call_0"
+                                tool_name = p_data.get("tool", "tool")
+                                state = p_data.get("state") or {}
+                                output = state.get("output", "")
+                                session.messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": call_id,
+                                    "name": tool_name,
+                                    "content": str(output),
+                                })
+                        except Exception:
+                            continue
+
+            conn.close()
+            session.auto_save()
+            return session
+        except Exception:
+            return None

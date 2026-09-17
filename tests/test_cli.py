@@ -206,3 +206,22 @@ async def test_async_main_completion(capsys):
         await async_main()
         captured = capsys.readouterr()
         assert "complete -F _clichat_completion clichat" in captured.out
+
+
+@pytest.mark.asyncio
+async def test_slash_command_sessions_and_resume():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+
+    # /sessions with different source filters
+    for src in ("all", "clichat", "agy", "claude", "pi", "opencode"):
+        handled = await app.handle_slash_command(f"/sessions {src}")
+        assert handled is True
+
+    # /resume with agent prefix when session does not exist returns True and displays message
+    handled = await app.handle_slash_command("/resume agy non-existent-id")
+    assert handled is True
+
+    handled = await app.handle_slash_command("/resume opencode non-existent-id")
+    assert handled is True
+

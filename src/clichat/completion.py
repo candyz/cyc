@@ -26,7 +26,7 @@ _clichat_completion() {
             if [ -d "${session_dir}" ]; then
                 sessions=$(find "${session_dir}" -name "*.json" -exec basename {} .json \; 2>/dev/null)
             fi
-            COMPREPLY=( $(compgen -W "${sessions} LATEST" -- "${cur}") )
+            COMPREPLY=( $(compgen -W "${sessions} LATEST agy claude pi opencode clichat" -- "${cur}") )
             return 0
             ;;
         --completion)

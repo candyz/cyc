@@ -4,6 +4,7 @@ from typing import Optional
 from clichat.agent.tools.base import Tool
 
 MAX_OUTPUT_CHARS = 25000
+MAX_OUTPUT_LINES = 250
 
 class RunCommandTool(Tool):
     name = "run_command"
@@ -62,8 +63,23 @@ class RunCommandTool(Tool):
 
             full_output = "\n\n".join(combined) if combined else "[No output]"
 
+            lines = full_output.splitlines()
+            truncated = False
+            trunc_reasons = []
+
+            if len(lines) > MAX_OUTPUT_LINES:
+                lines = lines[:MAX_OUTPUT_LINES]
+                truncated = True
+                trunc_reasons.append(f"truncated to first {MAX_OUTPUT_LINES} lines")
+
+            full_output = "\n".join(lines)
             if len(full_output) > MAX_OUTPUT_CHARS:
-                full_output = full_output[:MAX_OUTPUT_CHARS] + f"\n\n[Note: Output truncated at {MAX_OUTPUT_CHARS} characters]"
+                full_output = full_output[:MAX_OUTPUT_CHARS]
+                truncated = True
+                trunc_reasons.append(f"truncated to {MAX_OUTPUT_CHARS} characters")
+
+            if truncated:
+                full_output += f"\n\n[Note: Output was {', and '.join(trunc_reasons)}. Consider refining command arguments or piping to grep/head.]"
 
             return f"Exit Code: {proc.returncode}\n\n{full_output}"
 

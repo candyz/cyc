@@ -144,3 +144,109 @@ def test_import_pi_session(tmp_path: Path):
     assert imported.messages[0]["content"] == "List the files"
     assert imported.messages[1]["role"] == "assistant"
     assert imported.messages[2]["role"] == "tool"
+
+
+def test_import_opencode_session(tmp_path: Path):
+    import sqlite3
+    db_file = tmp_path / "opencode.db"
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+    CREATE TABLE session (
+        id text PRIMARY KEY,
+        project_id text,
+        title text,
+        directory text,
+        agent text,
+        model text,
+        time_created integer,
+        time_updated integer
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE message (
+        id text PRIMARY KEY,
+        session_id text,
+        time_created integer,
+        time_updated integer,
+        data text
+    );
+    """)
+    cursor.execute("""
+    CREATE TABLE part (
+        id text PRIMARY KEY,
+        message_id text,
+        session_id text,
+        time_created integer,
+        time_updated integer,
+        data text
+    );
+    """)
+
+    # Insert sample opencode session
+    cursor.execute("""
+    INSERT INTO session (id, project_id, title, directory, agent, model, time_created, time_updated)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    """, (
+        "ses_test12345678",
+        "proj_1",
+        "New session - test",
+        "/tmp",
+        "build",
+        json.dumps({"id": "nemotron-test"}),
+        1700000000000,
+        1700000005000,
+    ))
+
+    # Insert user message
+    cursor.execute("""
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?);
+    """, ("msg_u1", "ses_test12345678", 1700000001000, 1700000001000, json.dumps({"role": "user"})))
+    cursor.execute("""
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?);
+    """, ("part_u1", "msg_u1", "ses_test12345678", 1700000001000, 1700000001000, json.dumps({"type": "text", "text": "Hello OpenCode"})))
+
+    # Insert assistant message with tool call
+    cursor.execute("""
+    INSERT INTO message (id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?);
+    """, ("msg_a1", "ses_test12345678", 1700000002000, 1700000002000, json.dumps({"role": "assistant"})))
+    cursor.execute("""
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?);
+    """, ("part_a1", "msg_a1", "ses_test12345678", 1700000002000, 1700000002000, json.dumps({"type": "text", "text": "Running tool"})))
+    cursor.execute("""
+    INSERT INTO part (id, message_id, session_id, time_created, time_updated, data)
+    VALUES (?, ?, ?, ?, ?, ?);
+    """, ("part_a2", "msg_a1", "ses_test12345678", 1700000002100, 1700000002100, json.dumps({
+        "type": "tool",
+        "tool": "read_file",
+        "callID": "call_oc_1",
+        "state": {"input": {"file": "a.txt"}, "output": "content_a"}
+    })))
+
+    conn.commit()
+    conn.close()
+
+    # List opencode sessions
+    opencode_sessions = SessionAdapters.list_opencode_sessions(db_path=db_file)
+    assert len(opencode_sessions) == 1
+    assert opencode_sessions[0]["id"] == "ses_test12345678"
+    assert opencode_sessions[0]["preview"] == "Hello OpenCode"
+    assert opencode_sessions[0]["model"] == "nemotron-test"
+
+    # Import opencode session
+    imported = SessionAdapters.import_opencode_session("ses_test", db_path=db_file)
+    assert imported is not None
+    assert imported.session_id == "opencode_ses_test1234"
+    assert imported.provider == "opencode"
+    assert len(imported.messages) == 3
+    assert imported.messages[0]["role"] == "user"
+    assert imported.messages[0]["content"] == "Hello OpenCode"
+    assert imported.messages[1]["role"] == "assistant"
+    assert "tool_calls" in imported.messages[1]
+    assert imported.messages[2]["role"] == "tool"
+    assert imported.messages[2]["content"] == "content_a"

@@ -72,6 +72,10 @@ async def test_run_command(tmp_path: Path):
     timeout_res = await cmd_tool.execute("sleep 2", timeout=1)
     assert "timed out after 1 seconds" in timeout_res
 
+    # Truncation test
+    trunc_res = await cmd_tool.execute("python3 -c \"for i in range(350): print(f'Line {i}')\"", cwd=str(tmp_path))
+    assert "truncated to first 250 lines" in trunc_res
+
 @pytest.mark.asyncio
 async def test_list_dir(tmp_path: Path):
     list_tool = ListDirTool()
