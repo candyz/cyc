@@ -57,6 +57,7 @@ class CommandCompleter(Completer):
             "/model",
             "/provider",
             "/system",
+            "/context",
             "/tokens",
             "/compact",
             "/usage",

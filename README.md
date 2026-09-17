@@ -86,7 +86,7 @@ clichat
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
 | `/system <prompt>` | 設定或檢視當前 System Prompt |
-| `/tokens [limit]` | 檢視或動態設定 Context Token 上限（支援 200k, 1m, 自適應模型規格） |
+| `/context [limit]` | 檢視或動態設定 Context Token 上限（支援 200k, 1m，亦支援 `/tokens` 別名） |
 | `/compact [ratio]` | 手動壓縮對話上下文（摘要過往歷程、精簡工具輸出） |
 | `/usage` | 檢視 Token 累積用量、模型訂閱狀態與 Rate Limit 限額資訊 |
 | `/multiline` | 切換多行 / 單行輸入模式 |

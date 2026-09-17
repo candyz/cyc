@@ -113,7 +113,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
     - `/loop <turns>`：調整回合上限（如 `/loop 100` 或 `/loop 50`）。
     - `/loop <strategy> <turns>`：同時切換策略與設定回合數（如 `/loop plan 80`）。
 
-### 4.3 動態模型上下文視窗與自動壓縮 (`/tokens` / `/compact`)
+### 4.3 動態模型上下文視窗與自動壓縮 (`/context` / `/compact`)
 - **狀態列即時顯示 Context**：狀態列改為 `Context: <current>/<limit>`，清楚呈現上下文記憶體的目前使用水位。
 - **自動壓縮機制 (Auto-Compaction)**：
   - 當上下文使用量達到 **80%** 時（可於 `config.yaml` 的 `agent.compact_threshold` 自訂，如 `0.80`），系統將自動啟動 Compact 演算法。
@@ -121,9 +121,9 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 - **手動壓縮指令 (`/compact`)**：
   - 輸入 `/compact` 隨時手動觸發上下文壓縮。
   - 支援指定壓縮目標比例（例如 `/compact 50%` 或 `/compact 0.4`）。
-- **動態上限調整 (`/tokens`)**：
-  - `/tokens`：顯示當前 Token 估算量、上下文視窗上限與利用率。
-  - `/tokens <limit>`：動態調整上限，支援 `k` / `m` 縮寫（例如 `/tokens 200k`、`/tokens 1m`、`/tokens 128000`）。
+- **動態上限調整 (`/context`)**：
+  - `/context`（或相容指令 `/tokens`）：顯示當前 Token 估算量、上下文視窗上限與利用率。
+  - `/context <limit>`：動態調整上限，支援 `k` / `m` 縮寫（例如 `/context 200k`、`/context 1m`、`/context 128000`）。
 
 
 ### 4.4 跨代理標準技能庫 (Standard Agent Skills)

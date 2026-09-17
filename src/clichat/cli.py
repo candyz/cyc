@@ -244,30 +244,30 @@ class CliApp:
             return True
         elif action == "/help":
             console.print(r"""[bold cyan]Available Commands:[/bold cyan]
-  /help                     Show this help message
-  /mode <mode>              Switch or inspect interaction mode (chat or agent)
-  /loop [strat] [turns]     Switch or inspect Agent loop strategy and max turns limit
-  /tools                    List registered agent tools (built-in & MCP)
-  /skills                   List available skills (builtin, global, workspace)
-  /skill <name>             Apply a specialized skill to agent instructions
-  /trust <action>           Check or change current workspace trust status (show/allow/deny)
-  /sessions <source>        List all saved chat & agent sessions (all, clichat, agy, etc.)
-  /resume <id>              Resume a previous session (or latest if omitted)
-  /fork <id>                Fork current session into a new branch
-  /sync <agent>             Sync session back to external agent (e.g. /sync agy)
-  /models                   List available models for the active provider
-  /model <name>             Switch active model (tab-completion supported)
-  /provider <name>          Switch active provider (tab-completion supported)
-  /system <prompt>          Set or inspect system prompt
-  /tokens [limit]           Inspect or update context window token limit
-  /compact [ratio]          Manually compact conversation context (summarize & prune)
-  /usage                    Show token usage, subscription tier & rate limits
-  /multiline                Toggle multi-line input mode
-  /save <filepath>          Save current conversation to Markdown (.md) or JSON (.json)
-  /load <filepath>          Load previous conversation from a JSON file
-  /undo                     Undo last turn's changes and conversation
-  /clear                    Clear current session history
-  /exit or /quit            Exit CLI""")
+  /help                       Show this help message
+  /mode <mode>                Switch or inspect interaction mode (chat or agent)
+  /loop [strat] [turns]       Switch or inspect Agent loop strategy and max turns limit
+  /tools                      List registered agent tools (built-in & MCP)
+  /skills                     List available skills (builtin, global, workspace)
+  /skill <name>               Apply a specialized skill to agent instructions
+  /trust <action>             Check or change current workspace trust status (show/allow/deny)
+  /sessions <source>          List all saved chat & agent sessions (all, clichat, agy, etc.)
+  /resume <id>                Resume a previous session (or latest if omitted)
+  /fork <id>                  Fork current session into a new branch
+  /sync <agent>               Sync session back to external agent (e.g. /sync agy)
+  /models                     List available models for the active provider
+  /model <name>               Switch active model (tab-completion supported)
+  /provider <name>            Switch active provider (tab-completion supported)
+  /system <prompt>            Set or inspect system prompt
+  /context [limit]            Inspect or update context window token limit
+  /compact [ratio]            Manually compact conversation context (summarize & prune)
+  /usage                      Show token usage, subscription tier & rate limits
+  /multiline                  Toggle multi-line input mode
+  /save <filepath>            Save current conversation to Markdown (.md) or JSON (.json)
+  /load <filepath>            Load previous conversation from a JSON file
+  /undo                       Undo last turn's changes and conversation
+  /clear                      Clear current session history
+  /exit or /quit              Exit CLI""")
             return True
         elif action == "/sessions":
             # Support: /sessions [all|clichat|agy|claude|pi|opencode]
@@ -556,7 +556,7 @@ class CliApp:
                 self.session.set_system_prompt(arg)
                 console.print(f"[bold green]System prompt updated:[/bold green] {arg}")
             return True
-        elif action == "/tokens":
+        elif action in ("/context", "/tokens"):
             if arg:
                 clean_arg = arg.replace(",", "").replace("_", "").lower()
                 multiplier = 1
@@ -577,7 +577,7 @@ class CliApp:
                     self.session.max_context_tokens = new_limit
                     console.print(f"[bold green]Updated context window token limit to:[/bold green] [bold cyan]{new_limit:,}[/bold cyan] tokens")
                 else:
-                    console.print(f"[yellow]Invalid token limit: '{arg}'. Example: /tokens 128000, /tokens 200k, or /tokens 1m[/yellow]")
+                    console.print(f"[yellow]Invalid token limit: '{arg}'. Example: /context 128000, /context 200k, or /context 1m[/yellow]")
 
             self.ui.print_tokens_stats(
                 tokens=self.session.total_estimated_tokens(),

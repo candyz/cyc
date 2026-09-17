@@ -172,12 +172,12 @@ async def test_slash_commands_dsh(tmp_path):
     assert app.agent_loop.strategy == "plan"
     assert app.agent_loop.max_turns == 100
 
-    # Test /tokens command
-    await app.handle_slash_command("/tokens 200k")
+    # Test /context and /tokens command
+    await app.handle_slash_command("/context 200k")
     assert app.session.max_context_tokens == 200_000
     await app.handle_slash_command("/tokens 1m")
     assert app.session.max_context_tokens == 1_000_000
-    await app.handle_slash_command("/tokens 64000")
+    await app.handle_slash_command("/context 64000")
     assert app.session.max_context_tokens == 64_000
 
     # Test /compact command
