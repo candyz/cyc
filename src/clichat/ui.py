@@ -108,7 +108,8 @@ class TerminalUI:
         self.console.print(Panel(body, title=title, border_style="cyan" if mode == "chat" else "magenta", box=ROUNDED))
 
     def print_sessions_table(self, sessions: List[Dict]):
-        table = Table(title=f"Saved Chat & Agent Sessions ({len(sessions)})", box=ROUNDED)
+        table = Table(title=f"Chat & Agent Sessions ({len(sessions)})", box=ROUNDED)
+        table.add_column("Agent / Source", style="bold yellow", justify="center")
         table.add_column("Session ID", style="bold cyan")
         table.add_column("Mode", justify="center")
         table.add_column("Provider / Model", style="green")
@@ -120,9 +121,22 @@ class TerminalUI:
         for s in sessions:
             m_time = datetime.datetime.fromtimestamp(s["updated_at"]).strftime("%Y-%m-%d %H:%M")
             mode_badge = "[magenta]AGENT[/magenta]" if s.get("mode") == "agent" else "[cyan]CHAT[/cyan]"
-            prov_model = f"{s.get('provider', '-')}/{s.get('model', '-')}"
+            prov = s.get('provider') or '-'
+            mod = s.get('model') or '-'
+            prov_model = f"{prov}/{mod}"
+            agent_source = s.get("agent", "clichat").upper()
+            if agent_source == "AGY":
+                agent_col = "[bold cyan]AGY[/bold cyan]"
+            elif agent_source == "CLAUDE":
+                agent_col = "[bold magenta]CLAUDE[/bold magenta]"
+            elif agent_source == "PI":
+                agent_col = "[bold yellow]PI[/bold yellow]"
+            else:
+                agent_col = "[bold green]CLICHAT[/bold green]"
+
             table.add_row(
-                s["session_id"],
+                agent_col,
+                s["session_id"] if "session_id" in s else s.get("id", "-"),
                 mode_badge,
                 prov_model,
                 str(s.get("message_count", 0)),

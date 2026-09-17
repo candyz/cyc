@@ -16,6 +16,7 @@ from clichat.agent import (
     ToolRegistry,
     build_coding_agent_system_prompt,
 )
+from clichat.adapters import SessionAdapters
 from clichat.config import Config, init_config_file, load_config
 from clichat.providers import create_provider
 from clichat.providers.base import BaseProvider
@@ -154,24 +155,61 @@ class CliApp:
   /exit or /quit      Exit CLI""")
             return True
         elif action == "/sessions":
-            sessions = SessionManager.list_sessions()
+            # Support: /sessions [all|agy|claude|pi|clichat]
+            filter_source = arg.lower() if arg else "all"
+            sessions = []
+            if filter_source in ("all", "clichat"):
+                sessions.extend(SessionManager.list_sessions())
+            if filter_source in ("all", "agy"):
+                sessions.extend(SessionAdapters.list_agy_sessions())
+            if filter_source in ("all", "claude"):
+                sessions.extend(SessionAdapters.list_claude_sessions())
+            if filter_source in ("all", "pi"):
+                sessions.extend(SessionAdapters.list_pi_sessions())
+
+            sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+
             if sessions:
                 self.ui.print_sessions_table(sessions)
-                console.print("[dim]Use '/resume <session_id>' to switch to a previous session.[/dim]")
+                console.print("[dim]Use '/resume <session_id>' (or --resume <id>) to resume or import from agy, claude, or pi.[/dim]")
             else:
-                console.print("[yellow]No saved sessions found.[/yellow]")
+                console.print(f"[yellow]No saved sessions found for source '{filter_source}'.[/yellow]")
             return True
         elif action == "/resume":
+            loaded_session = None
             if not arg:
-                # Resume latest session
+                # Resume latest clichat session
                 loaded_session = SessionManager.get_latest_session()
+                if not loaded_session:
+                    # Fallback to latest agy or claude if no clichat session
+                    agy_list = SessionAdapters.list_agy_sessions()
+                    if agy_list:
+                        loaded_session = SessionAdapters.import_agy_session(agy_list[0]["id"])
                 if not loaded_session:
                     console.print("[yellow]No saved sessions available to resume.[/yellow]")
                     return True
             else:
-                loaded_session = SessionManager.find_session(arg)
+                target_query = arg
+                # Check clichat sessions first
+                loaded_session = SessionManager.find_session(target_query)
+
+                # Check agy if starts with agy_ or matches agy UUID
                 if not loaded_session:
-                    console.print(f"[bold red]Session not found matching:[/bold red] {arg}")
+                    clean_query = target_query[4:] if target_query.startswith("agy_") else target_query
+                    loaded_session = SessionAdapters.import_agy_session(clean_query)
+
+                # Check claude if starts with claude_ or matches claude ID
+                if not loaded_session:
+                    clean_query = target_query[7:] if target_query.startswith("claude_") else target_query
+                    loaded_session = SessionAdapters.import_claude_session(clean_query)
+
+                # Check pi if starts with pi_ or matches pi ID
+                if not loaded_session:
+                    clean_query = target_query[3:] if target_query.startswith("pi_") else target_query
+                    loaded_session = SessionAdapters.import_pi_session(clean_query)
+
+                if not loaded_session:
+                    console.print(f"[bold red]Session not found in clichat, agy, claude, or pi:[/bold red] {target_query}")
                     return True
 
             self.session = loaded_session
@@ -385,7 +423,13 @@ async def async_main():
 
     # Handle '--sessions'
     if args.sessions:
-        sessions = SessionManager.list_sessions()
+        sessions = []
+        sessions.extend(SessionManager.list_sessions())
+        sessions.extend(SessionAdapters.list_agy_sessions())
+        sessions.extend(SessionAdapters.list_claude_sessions())
+        sessions.extend(SessionAdapters.list_pi_sessions())
+        sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+
         ui = TerminalUI()
         if sessions:
             ui.print_sessions_table(sessions)
@@ -416,11 +460,30 @@ async def async_main():
         if args.resume == "LATEST":
             resumed_session = SessionManager.get_latest_session()
             if not resumed_session:
+                agy_list = SessionAdapters.list_agy_sessions()
+                if agy_list:
+                    resumed_session = SessionAdapters.import_agy_session(agy_list[0]["id"])
+            if not resumed_session:
                 console.print("[yellow]No previous sessions found to resume. Starting new session.[/yellow]")
         else:
-            resumed_session = SessionManager.find_session(args.resume)
+            query = args.resume
+            # Try clichat
+            resumed_session = SessionManager.find_session(query)
+            # Try agy
             if not resumed_session:
-                console.print(f"[bold red]Session not found matching:[/bold red] {args.resume}. Starting new session.")
+                clean_q = query[4:] if query.startswith("agy_") else query
+                resumed_session = SessionAdapters.import_agy_session(clean_q)
+            # Try claude
+            if not resumed_session:
+                clean_q = query[7:] if query.startswith("claude_") else query
+                resumed_session = SessionAdapters.import_claude_session(clean_q)
+            # Try pi
+            if not resumed_session:
+                clean_q = query[3:] if query.startswith("pi_") else query
+                resumed_session = SessionAdapters.import_pi_session(clean_q)
+
+            if not resumed_session:
+                console.print(f"[bold red]Session not found in clichat, agy, claude, or pi:[/bold red] {query}. Starting new session.")
 
     # Determine mode and permissions
     if resumed_session and resumed_session.mode and not args.agent:

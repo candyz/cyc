@@ -1,6 +1,6 @@
 [project]
 name = "clichat"
-version = "0.2.3"
+version = "0.2.4"
 description = "CLI chat and autonomous coding agent for local and cloud LLMs"
 readme = "README.md"
 requires-python = ">=3.10"
