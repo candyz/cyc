@@ -14,6 +14,7 @@ from clichat.agent import (
     PermissionManager,
     PermissionMode,
     ToolRegistry,
+    WorkspaceTrustManager,
     build_coding_agent_system_prompt,
 )
 from clichat.adapters import SessionAdapters
@@ -57,8 +58,17 @@ class CliApp:
 
         # Agent configuration
         self.mode = mode  # "chat" or "agent"
+        self.workspace_path = Path.cwd()
+        self.trust_manager = WorkspaceTrustManager()
+        self.is_workspace_trusted = self.trust_manager.get_trust_status(self.workspace_path)
+
+        # If untrusted/restricted, force read-only permission mode
+        effective_perm_mode = permission_mode
+        if self.is_workspace_trusted is False:
+            effective_perm_mode = PermissionMode.READ_ONLY
+
         self.tool_registry = ToolRegistry()
-        self.permission_manager = PermissionManager(permission_mode)
+        self.permission_manager = PermissionManager(effective_perm_mode)
         self.agent_loop = AgentLoop(
             provider=self.provider,
             model=self.model,
@@ -141,6 +151,7 @@ class CliApp:
   /help               Show this help message
   /mode \[chat|agent] Switch or inspect interaction mode (chat or agent)
   /tools              List registered agent tools and descriptions
+  /trust [show|allow|deny] Check or change current workspace trust status
   /sessions           List all saved chat & agent sessions
   /resume [id]        Resume a previous session (or latest if omitted)
   /models             List available models for the active provider
@@ -243,6 +254,29 @@ class CliApp:
         elif action == "/tools":
             self.ui.print_tools_table(self.tool_registry.all_tools())
             return True
+        elif action == "/trust":
+            subcmd = arg.lower().strip() if arg else "show"
+            if subcmd == "show":
+                status = self.trust_manager.get_trust_status(self.workspace_path)
+                if status is True:
+                    console.print(f"[bold green]Workspace Status:[/bold green] Trusted ({self.workspace_path})")
+                elif status is False:
+                    console.print(f"[bold yellow]Workspace Status:[/bold yellow] Restricted / Untrusted ({self.workspace_path})")
+                else:
+                    console.print(f"[bold]Workspace Status:[/bold] Undecided ({self.workspace_path})")
+            elif subcmd in ("allow", "trust", "yes", "true"):
+                self.trust_manager.set_trust(self.workspace_path, True)
+                self.is_workspace_trusted = True
+                self.permission_manager.mode = PermissionMode.INTERACTIVE
+                console.print(f"[bold green]Workspace trusted:[/bold green] Full agent permissions restored for {self.workspace_path}")
+            elif subcmd in ("deny", "restrict", "no", "false"):
+                self.trust_manager.set_trust(self.workspace_path, False)
+                self.is_workspace_trusted = False
+                self.permission_manager.mode = PermissionMode.READ_ONLY
+                console.print(f"[bold yellow]Workspace restricted:[/bold yellow] Agent locked to [bold]Read-Only[/bold] mode for {self.workspace_path}")
+            else:
+                console.print("[yellow]Usage: /trust [show|allow|deny][/yellow]")
+            return True
         elif action == "/multiline":
             self.multiline_mode = not self.multiline_mode
             status = "[bold green]ON[/bold green] (Press Esc+Enter to submit)" if self.multiline_mode else "[bold yellow]OFF[/bold yellow] (Press Enter to submit, Alt+Enter for newline)"
@@ -334,6 +368,13 @@ class CliApp:
         mode_badge = f"<b><style bg='ansimagenta' fg='ansiwhite'> AGENT </style></b>" if self.mode == "agent" else f"<b><style bg='ansicyan' fg='ansiwhite'> CHAT </style></b>"
         ml_badge = "<style fg='ansimagenta'>[Multi-line: Esc+Enter]</style>" if self.multiline_mode else "<style fg='ansigray'>[Single-line]</style>"
 
+        if self.is_workspace_trusted is False:
+            trust_badge = "<style bg='ansired' fg='ansiwhite'><b> UNTRUSTED (READ-ONLY) </b></style>"
+        elif self.is_workspace_trusted is True:
+            trust_badge = "<style fg='ansigreen'>[Trusted]</style>"
+        else:
+            trust_badge = "<style fg='ansiyellow'>[Untrusted]</style>"
+
         tokens = self.session.total_estimated_tokens()
         limit = self.session.max_context_tokens
         token_str = f"{tokens}/{limit}"
@@ -343,6 +384,7 @@ class CliApp:
             f"<b>Provider:</b> <style fg='ansigreen'>{self.provider_name}</style> | "
             f"<b>Model:</b> <style fg='ansicyan'>{self.model}</style> | "
             f"<b>Tokens:</b> <style fg='ansiyellow'>{token_str}</style> | "
+            f"{trust_badge} | "
             f"{ml_badge} "
             f"<style fg='ansigray'>(Type /help for commands)</style> "
         )
@@ -415,6 +457,8 @@ def parse_args():
     parser.add_argument("--read-only", action="store_true", help="Block all mutation tools (write_file, replace, run_command)")
     parser.add_argument("-r", "--resume", nargs="?", const="LATEST", help="Resume a previous session by ID/prefix (or latest if omitted)")
     parser.add_argument("--sessions", action="store_true", help="List all saved chat & agent sessions and exit")
+    parser.add_argument("--trust", action="store_true", default=None, help="Explicitly trust current workspace without prompting")
+    parser.add_argument("--no-trust", action="store_true", default=None, help="Explicitly restrict current workspace (force Read-Only mode)")
     return parser.parse_args()
 
 async def async_main():
@@ -491,7 +535,25 @@ async def async_main():
     else:
         mode = "agent" if args.agent else "chat"
 
-    if args.read_only:
+    # Workspace trust evaluation (especially relevant for agent mode or when flags passed)
+    trust_mgr = WorkspaceTrustManager()
+    auto_trust_flag = True if args.trust else (False if args.no_trust else None)
+
+    # In agent mode without explicit flags, prompt if workspace not yet trusted/restricted
+    if mode == "agent" and auto_trust_flag is None and trust_mgr.get_trust_status(Path.cwd()) is None:
+        if sys.stdin.isatty():
+            is_trusted = await trust_mgr.ensure_workspace_trust(Path.cwd())
+        else:
+            # Non-interactive stdin defaults to restricted for safety
+            is_trusted = False
+            trust_mgr.set_trust(Path.cwd(), False)
+    elif auto_trust_flag is not None:
+        trust_mgr.set_trust(Path.cwd(), auto_trust_flag)
+        is_trusted = auto_trust_flag
+    else:
+        is_trusted = trust_mgr.get_trust_status(Path.cwd())
+
+    if args.read_only or is_trusted is False:
         permission_mode = PermissionMode.READ_ONLY
     elif args.yes:
         permission_mode = PermissionMode.AUTO

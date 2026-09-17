@@ -14,6 +14,7 @@ from clichat.agent.tools import (
 from clichat.agent.permissions import PermissionManager, PermissionMode
 from clichat.agent.prompt import build_coding_agent_system_prompt
 from clichat.agent.loop import AgentLoop
+from clichat.agent.trust import WorkspaceTrustManager
 
 __all__ = [
     "Tool",
@@ -29,4 +30,5 @@ __all__ = [
     "PermissionMode",
     "build_coding_agent_system_prompt",
     "AgentLoop",
+    "WorkspaceTrustManager",
 ]

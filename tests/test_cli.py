@@ -160,3 +160,31 @@ def test_parse_args_resume_and_sessions():
     with patch.object(sys, "argv", ["clichat", "--sessions"]):
         args = parse_args()
         assert args.sessions is True
+
+
+@pytest.mark.asyncio
+async def test_slash_command_trust(tmp_path: Path):
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+
+    handled = await app.handle_slash_command("/trust show")
+    assert handled is True
+
+    handled = await app.handle_slash_command("/trust allow")
+    assert handled is True
+    assert app.is_workspace_trusted is True
+
+    handled = await app.handle_slash_command("/trust deny")
+    assert handled is True
+    assert app.is_workspace_trusted is False
+    assert app.permission_manager.mode.value == "read_only"
+
+
+def test_parse_args_trust_flags():
+    with patch.object(sys, "argv", ["clichat", "--trust"]):
+        args = parse_args()
+        assert args.trust is True
+
+    with patch.object(sys, "argv", ["clichat", "--no-trust"]):
+        args = parse_args()
+        assert args.no_trust is True

@@ -50,6 +50,7 @@ class CommandCompleter(Completer):
             "/tools",
             "/sessions",
             "/resume",
+            "/trust",
             "/multiline",
             "/save",
             "/load",
@@ -78,6 +79,10 @@ class CommandCompleter(Completer):
             for mode in ("chat", "agent"):
                 if mode.startswith(arg_prefix.lower()):
                     yield Completion(mode, start_position=-len(arg_prefix))
+        elif cmd == "/trust":
+            for opt in ("show", "allow", "deny"):
+                if opt.startswith(arg_prefix.lower()):
+                    yield Completion(opt, start_position=-len(arg_prefix))
         elif cmd == "/model":
             for m in self.get_models():
                 if m.lower().startswith(arg_prefix.lower()):
