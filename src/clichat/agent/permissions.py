@@ -58,6 +58,12 @@ class PermissionManager:
             cmd = args.get("command", "")
             cwd = args.get("cwd", ".")
             console.print(Panel(f"[bold cyan]Command:[/bold cyan] {cmd}\n[dim]Working directory: {cwd}[/dim]", title="⚠️  Shell Command Execution", border_style="yellow"))
+        elif tool.name == "run_script":
+            code = args.get("code", "")
+            lang = args.get("language", "python")
+            from rich.syntax import Syntax
+            syntax = Syntax(code, lang, theme="monokai", line_numbers=True)
+            console.print(Panel(syntax, title=f"⚠️  Programmatic Tool Script (PTC): {lang}", border_style="yellow"))
 
         # Prompt user for confirmation
         question = prompt_text or f"Allow '{tool.name}' to execute? [y]es / [n]o / [a]lways for this session: "

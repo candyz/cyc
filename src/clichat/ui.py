@@ -43,16 +43,20 @@ class CommandCompleter(Completer):
         self.path_completer = PathCompleter(expanduser=True)
         self.commands = [
             "/help",
+            "/mode",
+            "/loop",
+            "/tools",
+            "/skills",
+            "/skill",
+            "/trust",
+            "/sessions",
+            "/resume",
+            "/fork",
             "/models",
             "/model",
             "/provider",
             "/system",
             "/tokens",
-            "/mode",
-            "/tools",
-            "/sessions",
-            "/resume",
-            "/trust",
             "/multiline",
             "/save",
             "/load",
@@ -91,6 +95,19 @@ class CommandCompleter(Completer):
             for mode in ("chat", "agent"):
                 if mode.startswith(arg_prefix.lower()):
                     yield Completion(mode, start_position=-len(arg_prefix))
+        elif cmd == "/loop":
+            for strat in ("standard", "plan", "minimal"):
+                if strat.startswith(arg_prefix.lower()):
+                    yield Completion(strat, start_position=-len(arg_prefix))
+        elif cmd == "/skill":
+            try:
+                from clichat.agent.skills import SkillManager
+                for s in SkillManager.list_skills():
+                    name = s["name"]
+                    if name.startswith(arg_prefix.lower()):
+                        yield Completion(name, start_position=-len(arg_prefix))
+            except Exception:
+                pass
         elif cmd == "/trust":
             for opt in ("show", "allow", "deny"):
                 if opt.startswith(arg_prefix.lower()):
@@ -220,6 +237,15 @@ class TerminalUI:
             source_badge = f"[bold magenta]MCP:{t.server_name}[/bold magenta]" if is_mcp else "[dim]BUILT-IN[/dim]"
             type_label = "[bold red]MUTATION[/bold red]" if getattr(t, "is_mutation", False) else "[green]READ-ONLY[/green]"
             table.add_row(t.name, source_badge, type_label, t.description)
+        self.console.print(table)
+
+    def print_skills_table(self, skills: List[Dict[str, str]]):
+        table = Table(title=f"Available Skills ({len(skills)})", box=ROUNDED)
+        table.add_column("Skill Name", style="bold cyan", width=15)
+        table.add_column("Description", style="dim")
+
+        for s in skills:
+            table.add_row(s["name"], s.get("description", ""))
         self.console.print(table)
 
     def print_models_table(self, models: List[str], current_model: str, provider: str):

@@ -22,6 +22,7 @@ class AgentLoop:
         permission_manager: Optional[PermissionManager] = None,
         max_turns: int = 15,
         ui: Optional[Any] = None,
+        strategy: str = "standard",
     ):
         self.provider = provider
         self.model = model
@@ -30,6 +31,7 @@ class AgentLoop:
         self.permission_manager = permission_manager or PermissionManager()
         self.max_turns = max_turns
         self.ui = ui
+        self.strategy = strategy.lower()  # "standard", "plan", "minimal"
 
     def _render_tool_call_card(self, tool_name: str, args: Dict[str, Any]):
         args_formatted = json.dumps(args, ensure_ascii=False, indent=2)
@@ -53,13 +55,25 @@ class AgentLoop:
         ))
 
     async def run_turn(self, user_prompt: str) -> str:
-        """Execute autonomous ReAct agent loop for a user query."""
-        self.session.add_user_message(user_prompt)
+        """Execute autonomous agent loop for a user query according to current strategy."""
+        # In 'plan' strategy, prepend planning guidance if it's a new complex request
+        effective_prompt = user_prompt
+        if self.strategy == "plan":
+            effective_prompt = (
+                f"{user_prompt}\n\n"
+                "[Instruction: Execute using Plan-and-Solve mode. First output a brief bullet-point plan of actions "
+                "before invoking tools. Follow each step and verify the result.]"
+            )
+
+        self.session.add_user_message(effective_prompt)
+
+        # Minimal strategy caps turns to 3
+        effective_max_turns = 3 if self.strategy == "minimal" else self.max_turns
 
         turn_count = 0
         final_content = ""
 
-        while turn_count < self.max_turns:
+        while turn_count < effective_max_turns:
             turn_count += 1
 
             # Prepare tool definitions suitable for provider

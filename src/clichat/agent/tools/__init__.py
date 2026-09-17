@@ -6,16 +6,17 @@ from clichat.agent.tools.filesystem import (
     ReplaceFileContentTool,
     ListDirTool,
 )
-from clichat.agent.tools.command import RunCommandTool
+from clichat.agent.tools.command import RunCommandTool, RunScriptTool
 from clichat.agent.tools.search import GrepSearchTool
 
 def get_default_tools() -> List[Tool]:
-    """Return an instantiated list of all 6 core built-in tools."""
+    """Return an instantiated list of all 7 core built-in tools."""
     return [
         ReadFileTool(),
         WriteFileTool(),
         ReplaceFileContentTool(),
         RunCommandTool(),
+        RunScriptTool(),
         ListDirTool(),
         GrepSearchTool(),
     ]
@@ -52,6 +53,7 @@ __all__ = [
     "WriteFileTool",
     "ReplaceFileContentTool",
     "RunCommandTool",
+    "RunScriptTool",
     "ListDirTool",
     "GrepSearchTool",
 ]

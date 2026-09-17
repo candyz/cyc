@@ -55,11 +55,32 @@ clichat
 ```
 
 
+- **Autonomous Coding Agent (自主編程代理)**：
+  - 核心工具：`read_file`, `write_file`, `replace_file_content`, `run_command`, `list_dir`, `grep_search`。
+  - **PTC (Programmatic Tool-Calling)**：透過 `run_script` 支援以單一 Turn 執行 Python / Bash 多步驟腳本與管線運算，顯著節省推論輪次。
+  - **可插拔 Loop 策略**：支援 `/loop` 動態切換 `standard` (15 輪 ReAct)、`plan` (先規劃後執行)、`minimal` (3 輪評測/快跑)。
+  - **Event-Sourced 與 Session 分支**：全面支援 Append-only `.events.jsonl` 事件源追蹤，並可使用 `/fork` 即時分岔會話實驗分支。
+  - **Skills vs. Plugins 分層架構**：提供 `SkillManager`，支援系統內建技能（`commit`, `test`, `refactor`）、全域技能 (`~/.config/clichat/skills`) 與專案工作區技能 (`.clichat/skills`)，支援 `/skills` 與 `/skill <name>`。
+  - **多代理對話相容**：無縫列出與接續 agy (`gemini`), claude code, pi, opencode 等代理之歷史會話 (`/sessions`, `/resume`)。
+- **安全與信任機制**：
+  - 專案工作區信任管理 (`/trust [show|allow|deny]`)，首次執行提示授權，限制未信任目錄為唯讀模式。
+  - 差異比對預覽：修改檔案時自動生成彩色 Unified Diff 並可互動確認。
+  - 支援一鍵還原回退 (`/undo`)，連帶可還原 git uncommitted 修改。
+
 ## Slash Commands (在 REPL 模式下)
 
 | 指令 | 說明 |
 | :--- | :--- |
 | `/help` | 顯示所有指令說明 |
+| `/mode [chat\|agent]` | 切換交談模式 (Chat) 或自主代理模式 (Agent) |
+| `/loop [standard\|plan\|minimal]` | 切換 Agent Loop 執行策略（標準、規劃、極簡快跑） |
+| `/tools` | 表格化列出所有已註冊的內建與 MCP 工具及其型態 |
+| `/skills` | 列出所有可用技能（內建 commit, test, refactor，全域或專案專屬） |
+| `/skill <name>` | 動態載入技能工作流程指引至 Agent 指令集中 |
+| `/trust [show\|allow\|deny]` | 檢視或切換當前專案工作區的信任授權狀態 |
+| `/sessions [agent]` | 列出所有已儲存會話（支援 clichat, agy, claude, pi, opencode） |
+| `/resume [id]` | 接續或跨代理匯入歷史會話 |
+| `/fork [new_id]` | 將目前會話分岔出獨立分支並立即切換 |
 | `/models` | 表格化列出當前 Provider 所有可用模型清單 |
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
@@ -68,6 +89,7 @@ clichat
 | `/multiline` | 切換多行 / 單行輸入模式 |
 | `/save <filepath>` | 儲存會話（`.md` 儲存為 Markdown，`.json` 儲存為結構化會話） |
 | `/load <filepath>` | 載入過往的 JSON 會話檔案並接續對話 |
+| `/undo` | 回退上一輪對話，並可選擇撤銷工作區未提交之 git 變更 |
 | `/clear` | 清空當前對話歷史 |
 | `/exit` 或 `/quit` | 退出對話 |
 

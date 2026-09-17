@@ -18,6 +18,7 @@ from clichat.agent import (
     build_coding_agent_system_prompt,
     StdioMCPClient,
     MCPDynamicTool,
+    SkillManager,
 )
 from clichat.adapters import SessionAdapters
 from clichat.completion import get_completion_script
@@ -218,10 +219,14 @@ class CliApp:
             console.print(r"""[bold cyan]Available Commands:[/bold cyan]
   /help                     Show this help message
   /mode \[chat|agent]        Switch or inspect interaction mode (chat or agent)
-  /tools                    List registered agent tools and descriptions
+  /loop \[standard|plan|minimal] Switch Agent loop execution strategy
+  /tools                    List registered agent tools (built-in & MCP)
+  /skills                   List available skills (builtin, global, workspace)
+  /skill <name>             Apply a specialized skill to agent instructions
   /trust \[show|allow|deny]  Check or change current workspace trust status
   /sessions                 List all saved chat & agent sessions
   /resume \[id]              Resume a previous session (or latest if omitted)
+  /fork \[new_id]            Fork current session into a new branch
   /models                   List available models for the active provider
   /model <name>             Switch active model (tab-completion supported)
   /provider <name>          Switch active provider (tab-completion supported)
@@ -381,6 +386,40 @@ class CliApp:
                     console.print(f"[bold green]Switched mode to:[/bold green] [bold {'magenta' if self.mode == 'agent' else 'cyan'}]{self.mode.upper()}[/bold {'magenta' if self.mode == 'agent' else 'cyan'}]")
                 else:
                     console.print("[yellow]Invalid mode. Choose 'chat' or 'agent'.[/yellow]")
+            return True
+        elif action == "/loop":
+            if not arg:
+                console.print(f"Current agent loop strategy: [bold green]{self.agent_loop.strategy}[/bold green] (Options: standard, plan, minimal)")
+            else:
+                strat = arg.lower().strip()
+                if strat in ("standard", "plan", "minimal"):
+                    self.agent_loop.strategy = strat
+                    console.print(f"[bold green]Switched Agent loop strategy to:[/bold green] [bold cyan]{strat}[/bold cyan]")
+                else:
+                    console.print("[yellow]Invalid strategy. Choose 'standard', 'plan', or 'minimal'.[/yellow]")
+            return True
+        elif action == "/fork":
+            forked_session = self.session.fork_session(new_id=arg if arg else None)
+            self.session = forked_session
+            self.agent_loop.session = forked_session
+            console.print(f"[bold green]✓ Session forked into new branch:[/bold green] [bold cyan]{self.session.session_id}[/bold cyan] ({len(self.session.messages)} messages copied)")
+            return True
+        elif action == "/skills":
+            skills = SkillManager.list_skills(self.workspace_path)
+            self.ui.print_skills_table(skills)
+            return True
+        elif action == "/skill":
+            if not arg:
+                console.print("[yellow]Usage: /skill <name>[/yellow]")
+            else:
+                skill = SkillManager.get_skill(arg, self.workspace_path)
+                if not skill:
+                    console.print(f"[bold red]Skill '{arg}' not found.[/bold red] Use '/skills' to list available skills.")
+                else:
+                    current_prompt = self.session.system_prompt or ""
+                    addition = f"\n\n[Skill: {skill['name']}]\n{skill['content']}"
+                    self.session.set_system_prompt(current_prompt + addition)
+                    console.print(f"[bold green]✓ Loaded skill '{skill['name']}':[/bold green] {skill.get('description', '')}")
             return True
         elif action == "/tools":
             self.ui.print_tools_table(self.tool_registry.all_tools())

@@ -44,9 +44,27 @@ class SessionManager:
         self.created_at = time.time()
         self.updated_at = time.time()
         self.history_checkpoints: List[List[Dict]] = []
+        self.events: List[Dict] = []
+
+    def append_event(self, event_type: str, data: Dict) -> None:
+        """Record an append-only event (Event-Sourced timeline)."""
+        self.events.append({
+            "type": event_type,
+            "timestamp": time.time(),
+            "data": data,
+        })
+        # Save append-only jsonl log
+        try:
+            log_file = self.sessions_dir / f"{self.session_id}.events.jsonl"
+            log_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(self.events[-1], ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def set_system_prompt(self, prompt: Optional[str]) -> None:
         self.system_prompt = prompt
+        self.append_event("system_prompt_set", {"prompt": prompt})
         self.auto_save()
 
     def add_user_message(self, content: str) -> None:
@@ -58,15 +76,37 @@ class SessionManager:
             self.history_checkpoints.pop(0)
 
         self.messages.append({"role": "user", "content": content})
+        self.append_event("user_message", {"content": content})
         self.updated_at = time.time()
         self._prune_context_if_needed()
         self.auto_save()
 
     def add_assistant_message(self, content: str) -> None:
         self.messages.append({"role": "assistant", "content": content})
+        self.append_event("assistant_message", {"content": content})
         self.updated_at = time.time()
         self._prune_context_if_needed()
         self.auto_save()
+
+    def fork_session(self, new_id: Optional[str] = None) -> "SessionManager":
+        """Fork this session into a new independent session branch with identical history."""
+        import copy
+        forked_id = new_id or f"{self.session_id}_fork_{int(time.time())}"
+        forked = SessionManager(
+            system_prompt=self.system_prompt,
+            max_context_tokens=self.max_context_tokens,
+            session_id=forked_id,
+            provider=self.provider,
+            model=self.model,
+            mode=self.mode,
+            sessions_dir=self.sessions_dir,
+        )
+        forked.messages = copy.deepcopy(self.messages)
+        forked.history_checkpoints = copy.deepcopy(self.history_checkpoints)
+        forked.events = copy.deepcopy(self.events)
+        forked.append_event("forked_from", {"parent_session_id": self.session_id})
+        forked.auto_save()
+        return forked
 
     def undo_turn(self) -> bool:
         """Roll back conversation messages to the state before the last user turn.
@@ -132,6 +172,7 @@ class SessionManager:
             "mode": self.mode,
             "system_prompt": self.system_prompt,
             "messages": self.messages,
+            "events": self.events,
             "estimated_tokens": self.total_estimated_tokens(),
         }
 
@@ -148,6 +189,7 @@ class SessionManager:
         manager.created_at = data.get("created_at", time.time())
         manager.updated_at = data.get("updated_at", manager.created_at)
         manager.messages = data.get("messages", [])
+        manager.events = data.get("events", [])
         return manager
 
     def save_json(self, path: Path) -> None:

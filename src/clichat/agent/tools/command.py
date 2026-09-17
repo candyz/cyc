@@ -85,3 +85,58 @@ class RunCommandTool(Tool):
 
         except Exception as e:
             return f"Error executing command '{command}': {e}"
+
+
+class RunScriptTool(Tool):
+    name = "run_script"
+    description = (
+        "Execute a multi-line programmatic script (Python or Bash) in a single turn (Programmatic Tool-Calling, PTC). "
+        "Allows writing pipelines to batch inspect, compute, or mutate files without multiple turn round-trips."
+    )
+    is_mutation = True
+    parameters = {
+        "type": "object",
+        "properties": {
+            "code": {
+                "type": "string",
+                "description": "The complete script code to execute.",
+            },
+            "language": {
+                "type": "string",
+                "enum": ["python", "bash", "sh"],
+                "description": "Script language interpreter (default: 'python').",
+            },
+            "timeout": {
+                "type": "integer",
+                "description": "Maximum execution time in seconds (default: 60).",
+            },
+        },
+        "required": ["code"],
+    }
+
+    async def execute(self, code: str, language: str = "python", timeout: int = 60, **kwargs) -> str:
+        lang = language.lower().strip()
+        cmd_tool = RunCommandTool()
+
+        if lang == "python":
+            import tempfile
+            with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as tmp:
+                tmp.write(code)
+                tmp_path = tmp.name
+            try:
+                result = await cmd_tool.execute(f"python3 {tmp_path}", timeout=timeout)
+                return result
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        elif lang in ("bash", "sh"):
+            import tempfile
+            with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False, encoding="utf-8") as tmp:
+                tmp.write(code)
+                tmp_path = tmp.name
+            try:
+                result = await cmd_tool.execute(f"bash {tmp_path}", timeout=timeout)
+                return result
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+        else:
+            return f"Error: Unsupported language '{language}'. Supported: 'python', 'bash'."
