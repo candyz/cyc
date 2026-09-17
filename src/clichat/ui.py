@@ -364,10 +364,33 @@ class TerminalUI:
                 self.console.print("\n[dim yellow](Interrupted by user)[/dim yellow]\n")
             return full_text
 
-        # Live Markdown stream
-        self.console.print()  # newline before markdown block
+        # Wait for the first chunk with an animated spinner
+        first_chunk = None
         try:
-            with Live(Markdown(""), console=self.console, refresh_per_second=12, transient=False) as live:
+            with self.console.status("[dim cyan]Thinking...[/dim cyan]", spinner="dots"):
+                try:
+                    first_chunk = await stream_gen.__anext__()
+                except StopAsyncIteration:
+                    first_chunk = None
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            self.console.print("\n[dim yellow](Interrupted by user)[/dim yellow]\n")
+            return full_text
+
+        self.console.print()  # newline before markdown block
+
+        if not first_chunk:
+            return full_text
+
+        full_text += first_chunk
+
+        # Live Markdown stream for remaining chunks
+        try:
+            with Live(Markdown(full_text), console=self.console, refresh_per_second=12, transient=False) as live:
+                # Update initial display if first chunk contained thinking
+                if "<think>" in full_text and "</think>" not in full_text:
+                    think_part = full_text.split("<think>", 1)[1]
+                    live.update(Markdown(f"> *Thinking...*\n\n```thinking\n{think_part}\n```"))
+
                 async for chunk in stream_gen:
                     full_text += chunk
                     # During streaming, if <think> tags are present, show a thinking indicator or styled text

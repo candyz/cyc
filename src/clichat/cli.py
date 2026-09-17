@@ -189,7 +189,19 @@ class CliApp:
         try:
             stream_gen = self.provider.chat_stream(self.session.get_messages(), self.model)
             response_text = ""
-            # In single prompt mode, stream directly to stdout
+            first_chunk = None
+
+            if sys.stdout.isatty():
+                with console.status("[dim cyan]Thinking...[/dim cyan]", spinner="dots"):
+                    try:
+                        first_chunk = await stream_gen.__anext__()
+                    except StopAsyncIteration:
+                        first_chunk = None
+                if first_chunk:
+                    sys.stdout.write(first_chunk)
+                    sys.stdout.flush()
+                    response_text += first_chunk
+
             async for chunk in stream_gen:
                 sys.stdout.write(chunk)
                 sys.stdout.flush()

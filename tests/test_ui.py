@@ -100,3 +100,18 @@ def test_terminal_ui_render():
     ui.render_formatted_response(sample_cot_resp)
     # Plain text without think
     ui.render_formatted_response("Standard answer without thinking tags.")
+
+
+import pytest
+
+@pytest.mark.asyncio
+async def test_terminal_ui_stream_response():
+    ui = TerminalUI(stream_markdown=True)
+
+    async def fake_stream():
+        yield "Hello "
+        yield "World!"
+
+    output = await ui.stream_response(fake_stream(), provider="test-prov", model="test-mod")
+    assert output == "Hello World!"
+

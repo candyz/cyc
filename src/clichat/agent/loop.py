@@ -83,11 +83,12 @@ class AgentLoop:
                 tools = self.tool_registry.to_openai_tools()
 
             # Query model with tool definitions
-            response: AgentTurnResponse = await self.provider.chat_with_tools(
-                messages=self.session.get_messages(),
-                model=self.model,
-                tools=tools,
-            )
+            with console.status(f"[dim cyan]Agent thinking (turn {turn_count}/{effective_max_turns})...[/dim cyan]", spinner="dots"):
+                response: AgentTurnResponse = await self.provider.chat_with_tools(
+                    messages=self.session.get_messages(),
+                    model=self.model,
+                    tools=tools,
+                )
 
             # Check if model wants to invoke tools
             if response.has_tool_calls:
@@ -122,7 +123,8 @@ class AgentLoop:
                         tool = self.tool_registry.get(tc.name)
                         permitted = await self.permission_manager.check_permission(tool, tc.arguments)
                         if permitted:
-                            observation = await tool.execute(**tc.arguments)
+                            with console.status(f"[dim cyan]Executing tool: {tc.name}...[/dim cyan]", spinner="dots"):
+                                observation = await tool.execute(**tc.arguments)
                             self._render_tool_result_preview(tc.name, observation)
                         else:
                             observation = "Error: Execution of this tool was denied by the user."
