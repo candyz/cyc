@@ -211,12 +211,15 @@ class TerminalUI:
     def print_tools_table(self, tools: List[Any]):
         table = Table(title=f"Registered Agent Tools ({len(tools)})", box=ROUNDED)
         table.add_column("Tool Name", style="bold cyan")
+        table.add_column("Source", justify="center")
         table.add_column("Type", justify="center")
         table.add_column("Description", style="dim")
 
         for t in tools:
+            is_mcp = hasattr(t, "server_name")
+            source_badge = f"[bold magenta]MCP:{t.server_name}[/bold magenta]" if is_mcp else "[dim]BUILT-IN[/dim]"
             type_label = "[bold red]MUTATION[/bold red]" if getattr(t, "is_mutation", False) else "[green]READ-ONLY[/green]"
-            table.add_row(t.name, type_label, t.description)
+            table.add_row(t.name, source_badge, type_label, t.description)
         self.console.print(table)
 
     def print_models_table(self, models: List[str], current_model: str, provider: str):

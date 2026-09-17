@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import yaml
 from pydantic import BaseModel, Field
 
@@ -26,6 +26,12 @@ class ProviderConfig(BaseModel):
     api_key: str = "placeholder"
     default_model: str = ""
 
+class MCPServerConfig(BaseModel):
+    command: str
+    args: List[str] = Field(default_factory=list)
+    env: Dict[str, str] = Field(default_factory=dict)
+    cwd: Optional[str] = None
+
 class UIConfig(BaseModel):
     theme: str = "monokai"
     stream: bool = True
@@ -35,6 +41,7 @@ class Config(BaseModel):
     default_provider: str = "ollama"
     default_model: str = ""
     providers: Dict[str, ProviderConfig] = Field(default_factory=dict)
+    mcp_servers: Dict[str, MCPServerConfig] = Field(default_factory=dict)
     ui: UIConfig = Field(default_factory=UIConfig)
 
     def get_provider(self, name: Optional[str] = None) -> ProviderConfig:
@@ -162,6 +169,16 @@ providers:
   opencode:
     type: opencode
     default_model: "opencode/nemotron-3.5-lightning-free"
+
+# MCP (Model Context Protocol) Servers (Optional)
+# Configure external tools via stdio-based MCP servers
+# mcp_servers:
+#   memory:
+#     command: "npx"
+#     args: ["-y", "@modelcontextprotocol/server-memory"]
+#   fetch:
+#     command: "uvx"
+#     args: ["mcp-server-fetch"]
 
 # Terminal UI configuration
 ui:

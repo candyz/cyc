@@ -16,6 +16,8 @@ from clichat.agent import (
     ToolRegistry,
     WorkspaceTrustManager,
     build_coding_agent_system_prompt,
+    StdioMCPClient,
+    MCPDynamicTool,
 )
 from clichat.adapters import SessionAdapters
 from clichat.completion import get_completion_script
@@ -70,6 +72,7 @@ class CliApp:
 
         self.tool_registry = ToolRegistry()
         self.permission_manager = PermissionManager(effective_perm_mode)
+        self.mcp_clients: List[StdioMCPClient] = []
         self.agent_loop = AgentLoop(
             provider=self.provider,
             model=self.model,
@@ -81,6 +84,44 @@ class CliApp:
 
         if self.mode == "agent" and not self.session.system_prompt:
             self.session.set_system_prompt(build_coding_agent_system_prompt())
+
+    async def init_mcp_servers(self) -> None:
+        """Connect to configured MCP servers, discover their tools, and register them."""
+        if not getattr(self.config, "mcp_servers", None):
+            return
+
+        for s_name, s_cfg in self.config.mcp_servers.items():
+            client = StdioMCPClient(
+                name=s_name,
+                command=s_cfg.command,
+                args=s_cfg.args,
+                env=s_cfg.env,
+                cwd=s_cfg.cwd,
+            )
+            started = await client.start()
+            if started:
+                self.mcp_clients.append(client)
+                tools_data = await client.list_tools()
+                for td in tools_data:
+                    mcp_tool = MCPDynamicTool(
+                        server_name=s_name,
+                        mcp_client=client,
+                        tool_data=td,
+                    )
+                    self.tool_registry.register(mcp_tool)
+                if tools_data:
+                    console.print(f"[dim green]✓ MCP '{s_name}': registered {len(tools_data)} external tool(s)[/dim green]")
+            else:
+                console.print(f"[dim yellow]⚠️  MCP server '{s_name}' failed to start or not found.[/dim yellow]")
+
+    async def close_mcp_servers(self) -> None:
+        """Gracefully shut down all active MCP client processes."""
+        for client in self.mcp_clients:
+            try:
+                await client.stop()
+            except Exception:
+                pass
+        self.mcp_clients.clear()
 
     def get_known_models(self) -> List[str]:
         return self.cached_models
@@ -760,11 +801,18 @@ async def async_main():
 
     prompt_arg = " ".join(args.prompt).strip()
 
-    if piped_input or prompt_arg:
-        full_prompt = f"{piped_input}\n\n{prompt_arg}".strip() if piped_input and prompt_arg else (piped_input or prompt_arg)
-        await app.run_single_prompt(full_prompt)
-    else:
-        await app.repl()
+    # Initialize MCP servers if configured
+    if config.mcp_servers:
+        await app.init_mcp_servers()
+
+    try:
+        if piped_input or prompt_arg:
+            full_prompt = f"{piped_input}\n\n{prompt_arg}".strip() if piped_input and prompt_arg else (piped_input or prompt_arg)
+            await app.run_single_prompt(full_prompt)
+        else:
+            await app.repl()
+    finally:
+        await app.close_mcp_servers()
 
 def main():
     try:
