@@ -180,6 +180,18 @@ async def test_slash_commands_dsh(tmp_path):
     await app.handle_slash_command("/tokens 64000")
     assert app.session.max_context_tokens == 64_000
 
+    # Test /compact command
+    app.session.max_context_tokens = 500
+    for i in range(10):
+        app.session.messages.append({"role": "user", "content": f"Historical message number {i} with substantial length text."})
+        app.session.messages.append({"role": "assistant", "content": f"Historical response number {i} with additional content text."})
+    initial_tokens = app.session.total_estimated_tokens()
+    assert initial_tokens > 250
+    compact_res = await app.handle_slash_command("/compact")
+    assert compact_res is True
+    assert app.session.total_estimated_tokens() < initial_tokens
+    assert any("[Context compacted:" in str(m.get("content", "")) for m in app.session.messages)
+
     # Test /skill command
     await app.handle_slash_command("/skill commit")
     assert app.session.system_prompt is not None

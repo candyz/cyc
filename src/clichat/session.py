@@ -1,7 +1,7 @@
 import json
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 DEFAULT_SESSIONS_DIR = Path.home() / ".local" / "share" / "clichat" / "sessions"
 
@@ -51,12 +51,14 @@ class SessionManager:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         mode: Optional[str] = None,
+        compact_threshold: float = 0.80,
         sessions_dir: Optional[Path] = None,
     ):
         self.system_prompt = system_prompt
         self.provider = provider
         self.model = model
         self.mode = mode
+        self.compact_threshold = compact_threshold
         if max_context_tokens is not None and max_context_tokens > 0:
             self.max_context_tokens = max_context_tokens
         else:
@@ -120,6 +122,19 @@ class SessionManager:
         self._prune_context_if_needed()
         self.auto_save()
 
+    def add_tool_message(self, tool_call_id: str, name: str, content: str) -> None:
+        self.messages.append({
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "name": name,
+            "content": content,
+        })
+        self.append_event("tool_message", {"name": name, "tool_call_id": tool_call_id})
+        self.total_completion_tokens += estimate_tokens(content)
+        self.updated_at = time.time()
+        self._prune_context_if_needed()
+        self.auto_save()
+
     def fork_session(self, new_id: Optional[str] = None) -> "SessionManager":
         """Fork this session into a new independent session branch with identical history."""
         import copy
@@ -131,6 +146,7 @@ class SessionManager:
             provider=self.provider,
             model=self.model,
             mode=self.mode,
+            compact_threshold=self.compact_threshold,
             sessions_dir=self.sessions_dir,
         )
         forked.messages = copy.deepcopy(self.messages)
@@ -187,10 +203,71 @@ class SessionManager:
             total += estimate_tokens(str(msg.get("content", ""))) + 4
         return total
 
-    def _prune_context_if_needed(self) -> None:
-        """Sliding window: prune oldest messages while preserving conversation coherence.
-        Ensures system prompt is never pruned.
+    def compact(self, target_ratio: float = 0.50) -> Dict[str, Any]:
+        """Compact session history by summarizing earlier messages and truncating oversized tool outputs.
+        Compresses conversation down to target_ratio of max_context_tokens.
+        Returns a dict summarizing before/after tokens and pruned count.
         """
+        initial_tokens = self.total_estimated_tokens()
+        target_tokens = int(self.max_context_tokens * target_ratio)
+
+        # 1. Truncate oversized tool observations first
+        for msg in self.messages:
+            if msg.get("role") == "tool" and isinstance(msg.get("content"), str):
+                content_str = msg["content"]
+                if len(content_str) > 600:
+                    msg["content"] = content_str[:300] + "\n... [Tool output compacted] ...\n" + content_str[-200:]
+
+        # 2. If still above target_tokens and have enough messages, summarize and prune older messages
+        pruned_count = 0
+        if self.total_estimated_tokens() > target_tokens and len(self.messages) > 4:
+            # Keep the most recent 4 messages intact
+            older_messages = self.messages[:-4]
+            recent_messages = self.messages[-4:]
+
+            # Extract brief summary highlights of older conversation
+            summary_points = []
+            for m in older_messages:
+                r = m.get("role", "unknown")
+                c = str(m.get("content", "")).strip().replace("\n", " ")
+                if len(c) > 120:
+                    c = c[:117] + "..."
+                if c:
+                    summary_points.append(f"- {r}: {c}")
+
+            summary_text = "[Context compacted: summary of earlier conversation]\n" + "\n".join(summary_points[:15])
+            compacted_msg = {
+                "role": "user",
+                "content": summary_text,
+            }
+            pruned_count = len(older_messages)
+            self.messages = [compacted_msg] + recent_messages
+
+        final_tokens = self.total_estimated_tokens()
+        self.updated_at = time.time()
+        self.append_event("session_compacted", {
+            "initial_tokens": initial_tokens,
+            "final_tokens": final_tokens,
+            "pruned_count": pruned_count,
+        })
+        self.auto_save()
+        return {
+            "initial_tokens": initial_tokens,
+            "final_tokens": final_tokens,
+            "pruned_count": pruned_count,
+            "saved_tokens": max(0, initial_tokens - final_tokens),
+        }
+
+    def _prune_context_if_needed(self) -> None:
+        """Check if context exceeds auto-compact threshold (default 80%) or hard limit.
+        If utilization >= compact_threshold, automatically compact session history.
+        """
+        if self.max_context_tokens > 0:
+            utilization = self.total_estimated_tokens() / self.max_context_tokens
+            if utilization >= self.compact_threshold and len(self.messages) > 4:
+                self.compact(target_ratio=0.50)
+
+        # Fallback hard sliding window if still exceeding hard limit
         while len(self.messages) > 2 and self.total_estimated_tokens() > self.max_context_tokens:
             self.messages.pop(0)
 
@@ -208,6 +285,7 @@ class SessionManager:
             "total_prompt_tokens": self.total_prompt_tokens,
             "total_completion_tokens": self.total_completion_tokens,
             "max_context_tokens": self.max_context_tokens,
+            "compact_threshold": self.compact_threshold,
             "external_metadata": self.external_metadata,
             "estimated_tokens": self.total_estimated_tokens(),
         }
@@ -221,6 +299,7 @@ class SessionManager:
             provider=data.get("provider"),
             model=data.get("model"),
             mode=data.get("mode"),
+            compact_threshold=data.get("compact_threshold", 0.80),
             sessions_dir=sessions_dir,
         )
         manager.created_at = data.get("created_at", time.time())

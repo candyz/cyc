@@ -111,7 +111,8 @@ def test_status_toolbar():
     toolbar_html = app._get_status_toolbar()
     assert "CHAT" in toolbar_html.value
     assert "ollama" in toolbar_html.value
-    assert "Tokens:" in toolbar_html.value
+    assert "Context:" in toolbar_html.value
+    assert "(Type /help for commands)" not in toolbar_html.value
 
     app.mode = "agent"
     toolbar_html_agent = app._get_status_toolbar()

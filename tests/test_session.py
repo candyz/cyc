@@ -151,3 +151,17 @@ def test_dynamic_context_limits():
     s_custom = SessionManager(provider="agy", model="gemini-3.8-flash-low", max_context_tokens=50_000)
     assert s_custom.max_context_tokens == 50_000
 
+
+def test_session_auto_compact():
+    session = SessionManager(max_context_tokens=200, compact_threshold=0.80)
+    # 80% of 200 is 160 tokens
+    # Add messages gradually
+    for i in range(8):
+        session.add_user_message(f"User message number {i} discussing context compression with extra words")
+        session.add_assistant_message(f"Assistant response {i} explaining token efficiency and compaction")
+
+    # It should have triggered auto compaction
+    assert any("[Context compacted:" in str(m.get("content", "")) for m in session.messages)
+    assert session.total_estimated_tokens() <= 200
+
+

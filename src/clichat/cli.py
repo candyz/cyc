@@ -47,16 +47,20 @@ class CliApp:
         self.model = model_name or self.provider_config.default_model or config.default_model
         self.provider: BaseProvider = create_provider(self.provider_config)
         max_ctx = getattr(self.provider_config, "max_context_tokens", None)
+        compact_thresh = getattr(getattr(config, "agent", None), "compact_threshold", 0.80)
         self.session = session or SessionManager(
             provider=self.provider_name,
             model=self.model,
             mode=mode,
             max_context_tokens=max_ctx,
+            compact_threshold=compact_thresh,
         )
         # Ensure session metadata reflects current settings
         self.session.provider = self.provider_name
         self.session.model = self.model
         self.session.mode = mode
+        if hasattr(self.session, "compact_threshold"):
+            self.session.compact_threshold = compact_thresh
 
         self.ui = TerminalUI(stream_markdown=config.ui.markdown_render)
         self.cached_models: List[str] = []
@@ -256,6 +260,7 @@ class CliApp:
   /provider <name>          Switch active provider (tab-completion supported)
   /system <prompt>          Set or inspect system prompt
   /tokens [limit]           Inspect or update context window token limit
+  /compact [ratio]          Manually compact conversation context (summarize & prune)
   /usage                    Show token usage, subscription tier & rate limits
   /multiline                Toggle multi-line input mode
   /save <filepath>          Save current conversation to Markdown (.md) or JSON (.json)
@@ -580,6 +585,31 @@ class CliApp:
                 msg_count=len(self.session.messages),
             )
             return True
+        elif action == "/compact":
+            # Manual compaction command
+            target_ratio = 0.50
+            if arg:
+                clean_arg = arg.replace("%", "").strip()
+                try:
+                    val = float(clean_arg)
+                    if val > 1:
+                        target_ratio = val / 100.0
+                    elif 0 < val <= 1:
+                        target_ratio = val
+                except ValueError:
+                    pass
+
+            with console.status("[dim cyan]Compacting session context...[/dim cyan]", spinner="dots"):
+                res = self.session.compact(target_ratio=target_ratio)
+
+            init_t = res["initial_tokens"]
+            fin_t = res["final_tokens"]
+            saved_t = res["saved_tokens"]
+            pct_down = ((init_t - fin_t) / init_t * 100) if init_t > 0 else 0
+            console.print(f"[bold green]✓ Session compacted successfully:[/bold green] {init_t:,} → [bold cyan]{fin_t:,}[/bold cyan] tokens ([dim green]-{saved_t:,} tokens, -{pct_down:.1f}%[/dim green])")
+            if res.get("pruned_count", 0) > 0:
+                console.print(f"[dim]Summarized and consolidated {res['pruned_count']} earlier messages into context brief.[/dim]")
+            return True
         elif action == "/usage":
             provider_info = None
             try:
@@ -671,12 +701,36 @@ class CliApp:
             f" {mode_badge} "
             f"<b>Provider:</b> <style fg='ansigreen'>{self.provider_name}</style> | "
             f"<b>Model:</b> <style fg='ansicyan'>{self.model}</style> | "
-            f"<b>Tokens:</b> <style fg='ansiyellow'>{token_str}</style> | "
+            f"<b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
             f"{trust_badge} | "
             f"{ml_badge} "
-            f"<style fg='ansigray'>(Type /help for commands)</style> "
         )
         return HTML(status_text)
+
+    def print_status_bar(self) -> None:
+        """Render a standalone status line to terminal (e.g. after long agent turn scrolls)."""
+        mode_badge = "[bold white on magenta] AGENT [/bold white on magenta]" if self.mode == "agent" else "[bold white on cyan] CHAT [/bold white on cyan]"
+        ml_badge = "[magenta][Multi-line][/magenta]" if self.multiline_mode else "[dim][Single-line][/dim]"
+
+        if self.is_workspace_trusted is False:
+            trust_badge = "[bold white on red] UNTRUSTED (READ-ONLY) [/bold white on red]"
+        elif self.is_workspace_trusted is True:
+            trust_badge = "[green][Trusted][/green]"
+        else:
+            trust_badge = "[yellow][Untrusted][/yellow]"
+
+        tokens = self.session.total_estimated_tokens()
+        limit = self.session.max_context_tokens
+        token_str = f"{tokens}/{limit}"
+
+        console.print(
+            f"{mode_badge} "
+            f"[bold]Provider:[/bold] [green]{self.provider_name}[/green] | "
+            f"[bold]Model:[/bold] [cyan]{self.model}[/cyan] | "
+            f"[bold]Context:[/bold] [yellow]{token_str}[/yellow] | "
+            f"{trust_badge} | "
+            f"{ml_badge}"
+        )
 
     async def repl(self) -> None:
         self.ui.print_banner(self.provider_name, self.model, self.multiline_mode, mode=self.mode)
@@ -711,6 +765,8 @@ class CliApp:
                         await self.agent_loop.run_turn(user_input)
                     except Exception as e:
                         console.print(f"\n[bold red]Agent Error:[/bold red] {e}\n")
+                    finally:
+                        self.print_status_bar()
                     continue
 
                 self.session.add_user_message(user_input)

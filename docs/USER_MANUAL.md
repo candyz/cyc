@@ -113,10 +113,16 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
     - `/loop <turns>`：調整回合上限（如 `/loop 100` 或 `/loop 50`）。
     - `/loop <strategy> <turns>`：同時切換策略與設定回合數（如 `/loop plan 80`）。
 
-### 4.3 動態模型上下文視窗與 Token 管理 (`/tokens`)
-- 現代模型上下文視窗全面自適應：Gemini/Agy 自動調校為 1,000,000 Tokens (1M)，Claude 200,000 Tokens (200k)，DeepSeek / GPT-4o / NIM 128,000 Tokens (128k)，避免以往過早觸發滑動視窗修剪歷史記憶。
-- `/tokens` 指令支援隨時檢視與動態覆寫上下文限制：
-  - `/tokens`：顯示當前 Token 估算量、上下文視窗上限與歷史訊息數。
+### 4.3 動態模型上下文視窗與自動壓縮 (`/tokens` / `/compact`)
+- **狀態列即時顯示 Context**：狀態列改為 `Context: <current>/<limit>`，清楚呈現上下文記憶體的目前使用水位。
+- **自動壓縮機制 (Auto-Compaction)**：
+  - 當上下文使用量達到 **80%** 時（可於 `config.yaml` 的 `agent.compact_threshold` 自訂，如 `0.80`），系統將自動啟動 Compact 演算法。
+  - 先精簡過長之工具 Observation 輸出，再將過往歷史摘要整合成對話摘要快照，保留最新關鍵對話，避免觸發硬性記憶抹除。
+- **手動壓縮指令 (`/compact`)**：
+  - 輸入 `/compact` 隨時手動觸發上下文壓縮。
+  - 支援指定壓縮目標比例（例如 `/compact 50%` 或 `/compact 0.4`）。
+- **動態上限調整 (`/tokens`)**：
+  - `/tokens`：顯示當前 Token 估算量、上下文視窗上限與利用率。
   - `/tokens <limit>`：動態調整上限，支援 `k` / `m` 縮寫（例如 `/tokens 200k`、`/tokens 1m`、`/tokens 128000`）。
 
 

@@ -134,12 +134,11 @@ class AgentLoop:
                         observation = f"Error executing tool '{tc.name}': {e}"
 
                     # Append tool result to session
-                    self.session.messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "name": tc.name,
-                        "content": observation,
-                    })
+                    self.session.add_tool_message(
+                        tool_call_id=tc.id,
+                        name=tc.name,
+                        content=observation,
+                    )
 
                 # Loop continues with tool observations now in context
                 continue

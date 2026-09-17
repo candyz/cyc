@@ -58,6 +58,7 @@ class CommandCompleter(Completer):
             "/provider",
             "/system",
             "/tokens",
+            "/compact",
             "/usage",
             "/multiline",
             "/save",

@@ -40,6 +40,7 @@ class UIConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     max_turns: int = 100
+    compact_threshold: float = 0.80
 
 class Config(BaseModel):
     default_provider: str = "ollama"
@@ -100,6 +101,7 @@ DEFAULT_CONFIG_DICT = {
     },
     "agent": {
         "max_turns": 100,
+        "compact_threshold": 0.80,
     },
     "ui": {
         "theme": "monokai",
@@ -188,6 +190,11 @@ providers:
 #   fetch:
 #     command: "uvx"
 #     args: ["mcp-server-fetch"]
+
+# Agent configuration
+agent:
+  max_turns: 100
+  compact_threshold: 0.80
 
 # Terminal UI configuration
 ui:
