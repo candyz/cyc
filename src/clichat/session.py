@@ -45,6 +45,10 @@ class SessionManager:
         self.updated_at = time.time()
         self.history_checkpoints: List[List[Dict]] = []
         self.events: List[Dict] = []
+        # Cumulative token consumption tracking
+        self.total_prompt_tokens: int = 0
+        self.total_completion_tokens: int = 0
+
 
     def append_event(self, event_type: str, data: Dict) -> None:
         """Record an append-only event (Event-Sourced timeline)."""
@@ -77,6 +81,7 @@ class SessionManager:
 
         self.messages.append({"role": "user", "content": content})
         self.append_event("user_message", {"content": content})
+        self.total_prompt_tokens += estimate_tokens(content)
         self.updated_at = time.time()
         self._prune_context_if_needed()
         self.auto_save()
@@ -84,6 +89,7 @@ class SessionManager:
     def add_assistant_message(self, content: str) -> None:
         self.messages.append({"role": "assistant", "content": content})
         self.append_event("assistant_message", {"content": content})
+        self.total_completion_tokens += estimate_tokens(content)
         self.updated_at = time.time()
         self._prune_context_if_needed()
         self.auto_save()
@@ -173,6 +179,8 @@ class SessionManager:
             "system_prompt": self.system_prompt,
             "messages": self.messages,
             "events": self.events,
+            "total_prompt_tokens": self.total_prompt_tokens,
+            "total_completion_tokens": self.total_completion_tokens,
             "estimated_tokens": self.total_estimated_tokens(),
         }
 
@@ -190,6 +198,8 @@ class SessionManager:
         manager.updated_at = data.get("updated_at", manager.created_at)
         manager.messages = data.get("messages", [])
         manager.events = data.get("events", [])
+        manager.total_prompt_tokens = data.get("total_prompt_tokens", 0)
+        manager.total_completion_tokens = data.get("total_completion_tokens", 0)
         return manager
 
     def save_json(self, path: Path) -> None:

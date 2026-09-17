@@ -131,3 +131,21 @@ class GeminiProvider(BaseProvider):
                 "gemini-2.5-pro",
                 "gemini-2.0-flash",
             ]
+
+    async def get_usage_info(self, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        target_model = model or "gemini-2.5-flash"
+        info = {
+            "provider": "Google Gemini (AI Studio)",
+            "tier": "Free / Pay-as-you-go",
+            "model": target_model,
+        }
+        if "flash" in target_model.lower():
+            info["rate_limit_rpm"] = "15 RPM (Free Tier) / 1000 RPM (Pay-as-you-go)"
+            info["rate_limit_tpm"] = "1,000,000 TPM"
+            info["rate_limit_rpd"] = "1,500 RPD (Free Tier)"
+        else:
+            info["rate_limit_rpm"] = "2 RPM (Free Tier) / 360 RPM (Pay-as-you-go)"
+            info["rate_limit_tpm"] = "32,000 TPM"
+            info["rate_limit_rpd"] = "50 RPD (Free Tier)"
+        return info
+

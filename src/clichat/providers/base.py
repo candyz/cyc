@@ -51,3 +51,9 @@ class BaseProvider(ABC):
         async for chunk in self.chat_stream(messages, model, **kwargs):
             chunks.append(chunk)
         return AgentTurnResponse(content="".join(chunks), tool_calls=[])
+
+    async def get_usage_info(self, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Optional hook to fetch provider-level usage, billing, subscription quota, or rate limits."""
+        return None
+
+

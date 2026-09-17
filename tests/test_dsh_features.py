@@ -144,3 +144,31 @@ async def test_slash_commands_dsh(tmp_path):
     assert app.session.session_id == "dsh_fork_branch"
     assert app.agent_loop.session.session_id == "dsh_fork_branch"
     assert app.session.session_id != orig_id
+
+    # Test /usage command
+    app.session.add_user_message("Hello token count test")
+    app.session.add_assistant_message("Assistant reply test")
+    assert app.session.total_prompt_tokens > 0
+    assert app.session.total_completion_tokens > 0
+    usage_res = await app.handle_slash_command("/usage")
+    assert usage_res is True
+
+
+@pytest.mark.asyncio
+async def test_provider_usage_info():
+    from clichat.providers.gemini import GeminiProvider
+    from clichat.providers.agy import AntigravityProvider
+    from clichat.providers.opencode import OpenCodeProvider
+
+    gemini_prov = GeminiProvider(api_key="mock-key")
+    gemini_info = await gemini_prov.get_usage_info("gemini-2.5-flash")
+    assert "rate_limit_rpm" in gemini_info
+
+    agy_prov = AntigravityProvider()
+    agy_info = await agy_prov.get_usage_info("gemini-3.1-pro-high")
+    assert "Gemini AI Pro Subscription" in agy_info["tier"]
+
+    opencode_prov = OpenCodeProvider()
+    opencode_info = await opencode_prov.get_usage_info()
+    assert "Zen Free" in opencode_info["provider"]
+

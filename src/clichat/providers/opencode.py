@@ -2,7 +2,7 @@ import asyncio
 import json
 import re
 import shutil
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from clichat.providers.base import BaseProvider
 
@@ -150,3 +150,14 @@ class OpenCodeProvider(BaseProvider):
             return models if models else DEFAULT_OPENCODE_ZEN_MODELS
         except Exception:
             return DEFAULT_OPENCODE_ZEN_MODELS
+
+    async def get_usage_info(self, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        binary_available = bool(shutil.which(self.binary_path))
+        return {
+            "provider": "OpenCode Zen Free",
+            "tier": "Free / Community Contributor",
+            "model": model or "opencode/nemotron-3.5-lightning-free",
+            "rate_limit": "Free Tier / Dynamic Zen Pool",
+            "local_binary": "Installed" if binary_available else "Not Found",
+        }
+

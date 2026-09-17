@@ -2,7 +2,7 @@ import asyncio
 import json
 import re
 import shutil
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from clichat.providers.base import BaseProvider
 
@@ -133,3 +133,14 @@ class AntigravityProvider(BaseProvider):
             return models if models else DEFAULT_AGY_MODELS
         except Exception:
             return DEFAULT_AGY_MODELS
+
+    async def get_usage_info(self, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        binary_available = bool(shutil.which(self.binary_path))
+        return {
+            "provider": "Google Antigravity (agy)",
+            "tier": "Gemini AI Pro Subscription / Google Workspace",
+            "model": model or "gemini-3.1-pro-high",
+            "rate_limit": "Pro Subscription Quota (Managed by Google AGY)",
+            "local_binary": "Installed" if binary_available else "Not Found",
+        }
+

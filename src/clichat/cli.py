@@ -232,6 +232,7 @@ class CliApp:
   /provider <name>          Switch active provider (tab-completion supported)
   /system <prompt>          Set or inspect system prompt
   /tokens                   Show context token usage statistics
+  /usage                    Show token usage, subscription tier & rate limits
   /multiline                Toggle multi-line input mode
   /save <filepath>          Save current conversation to Markdown (.md) or JSON (.json)
   /load <filepath>          Load previous conversation from a JSON file
@@ -504,6 +505,23 @@ class CliApp:
                 tokens=self.session.total_estimated_tokens(),
                 limit=self.session.max_context_tokens,
                 msg_count=len(self.session.messages),
+            )
+            return True
+        elif action == "/usage":
+            provider_info = None
+            try:
+                provider_info = await self.provider.get_usage_info(self.model)
+            except Exception:
+                pass
+            self.ui.print_usage_stats(
+                provider_name=self.provider_name,
+                model_name=self.model,
+                context_tokens=self.session.total_estimated_tokens(),
+                context_limit=self.session.max_context_tokens,
+                msg_count=len(self.session.messages),
+                prompt_tokens=self.session.total_prompt_tokens,
+                completion_tokens=self.session.total_completion_tokens,
+                provider_info=provider_info,
             )
             return True
         elif action == "/save":

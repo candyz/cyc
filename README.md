@@ -86,6 +86,7 @@ clichat
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
 | `/system <prompt>` | 設定或檢視當前 System Prompt |
 | `/tokens` | 表格化顯示目前對話的 Token 估算量、上限與利用率 |
+| `/usage` | 檢視 Token 累積用量、模型訂閱狀態與 Rate Limit 限額資訊 |
 | `/multiline` | 切換多行 / 單行輸入模式 |
 | `/save <filepath>` | 儲存會話（`.md` 儲存為 Markdown，`.json` 儲存為結構化會話） |
 | `/load <filepath>` | 載入過往的 JSON 會話檔案並接續對話 |

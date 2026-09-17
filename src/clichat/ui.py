@@ -57,6 +57,7 @@ class CommandCompleter(Completer):
             "/provider",
             "/system",
             "/tokens",
+            "/usage",
             "/multiline",
             "/save",
             "/load",
@@ -267,6 +268,49 @@ class TerminalUI:
         table.add_row("Messages in Session", str(msg_count))
         table.add_row("Estimated Tokens", f"{tokens} / {limit}")
         table.add_row("Context Utilization", f"{percentage:.1f}%")
+        self.console.print(table)
+
+    def print_usage_stats(
+        self,
+        provider_name: str,
+        model_name: str,
+        context_tokens: int,
+        context_limit: int,
+        msg_count: int,
+        prompt_tokens: int,
+        completion_tokens: int,
+        provider_info: Optional[Dict[str, Any]] = None,
+    ):
+        table = Table(title="Token & Model Usage / Rate Limits", box=ROUNDED)
+        table.add_column("Category", style="bold cyan", width=22)
+        table.add_column("Metric / Property", style="bold")
+        table.add_column("Value / Status", style="green")
+
+        # 1. Context window utilization
+        percentage = (context_tokens / context_limit) * 100 if context_limit > 0 else 0
+        ctx_color = "green" if percentage < 60 else "yellow" if percentage < 85 else "red"
+        table.add_row("Context Window", "Active Context Tokens", f"[{ctx_color}]{context_tokens} / {context_limit} ({percentage:.1f}%)[/{ctx_color}]")
+        table.add_row("Context Window", "Messages in Context", str(msg_count))
+
+        # 2. Cumulative session consumption
+        total_session_tokens = prompt_tokens + completion_tokens
+        table.add_row("Session Consumption", "Cumulative Prompt Tokens", f"{prompt_tokens:,}")
+        table.add_row("Session Consumption", "Cumulative Completion Tokens", f"{completion_tokens:,}")
+        table.add_row("Session Consumption", "Total Session Tokens", f"[bold yellow]{total_session_tokens:,}[/bold yellow]")
+
+        # 3. Model & Provider Tier / Limits
+        table.add_row("Provider & Model", "Active Provider", provider_name)
+        table.add_row("Provider & Model", "Active Model", model_name)
+
+        if provider_info:
+            for k, v in provider_info.items():
+                if k in ("provider", "model"):
+                    continue
+                label = k.replace("_", " ").title()
+                table.add_row("Provider Limits", label, str(v))
+        else:
+            table.add_row("Provider Limits", "Account Status", "[dim]Local / Standalone API (No external quota API)[/dim]")
+
         self.console.print(table)
 
     def render_formatted_response(self, text: str) -> None:
