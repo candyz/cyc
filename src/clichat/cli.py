@@ -218,15 +218,15 @@ class CliApp:
         elif action == "/help":
             console.print(r"""[bold cyan]Available Commands:[/bold cyan]
   /help                     Show this help message
-  /mode \[chat|agent]        Switch or inspect interaction mode (chat or agent)
-  /loop \[standard|plan|minimal] Switch Agent loop execution strategy
+  /mode <mode>              Switch or inspect interaction mode (chat or agent)
+  /loop                     Switch or inspect Agent loop execution strategy
   /tools                    List registered agent tools (built-in & MCP)
   /skills                   List available skills (builtin, global, workspace)
   /skill <name>             Apply a specialized skill to agent instructions
-  /trust \[show|allow|deny]  Check or change current workspace trust status
-  /sessions                 List all saved chat & agent sessions
-  /resume \[id]              Resume a previous session (or latest if omitted)
-  /fork \[new_id]            Fork current session into a new branch
+  /trust <action>           Check or change current workspace trust status (show/allow/deny)
+  /sessions <source>        List all saved chat & agent sessions (all, clichat, agy, etc.)
+  /resume <id>              Resume a previous session (or latest if omitted)
+  /fork <id>                Fork current session into a new branch
   /models                   List available models for the active provider
   /model <name>             Switch active model (tab-completion supported)
   /provider <name>          Switch active provider (tab-completion supported)

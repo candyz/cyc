@@ -72,19 +72,19 @@ clichat
 | 指令 | 說明 |
 | :--- | :--- |
 | `/help` | 顯示所有指令說明 |
-| `/mode [chat\|agent]` | 切換交談模式 (Chat) 或自主代理模式 (Agent) |
-| `/loop [standard\|plan\|minimal]` | 切換 Agent Loop 執行策略（標準、規劃、極簡快跑） |
+| `/mode <mode>` | 切換交談模式 (chat) 或自主代理模式 (agent) |
+| `/loop` | 切換或檢視 Agent Loop 執行策略（standard, plan, minimal） |
 | `/tools` | 表格化列出所有已註冊的內建與 MCP 工具及其型態 |
 | `/skills` | 列出所有可用技能（內建 commit, test, refactor，全域或專案專屬） |
 | `/skill <name>` | 動態載入技能工作流程指引至 Agent 指令集中 |
-| `/trust [show\|allow\|deny]` | 檢視或切換當前專案工作區的信任授權狀態 |
-| `/sessions [agent]` | 列出所有已儲存會話（支援 clichat, agy, claude, pi, opencode） |
-| `/resume [id]` | 接續或跨代理匯入歷史會話 |
-| `/fork [new_id]` | 將目前會話分岔出獨立分支並立即切換 |
+| `/trust <action>` | 檢視或切換當前專案工作區的信任授權狀態（show, allow, deny） |
+| `/sessions <source>` | 列出所有已儲存會話（支援 all, clichat, agy, claude, pi, opencode） |
+| `/resume <id>` | 接續或跨代理匯入歷史會話 |
+| `/fork <id>` | 將目前會話分岔出獨立分支並立即切換 |
 | `/models` | 表格化列出當前 Provider 所有可用模型清單 |
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
-| `/system [prompt]` | 設定或檢視當前 System Prompt |
+| `/system <prompt>` | 設定或檢視當前 System Prompt |
 | `/tokens` | 表格化顯示目前對話的 Token 估算量、上限與利用率 |
 | `/multiline` | 切換多行 / 單行輸入模式 |
 | `/save <filepath>` | 儲存會話（`.md` 儲存為 Markdown，`.json` 儲存為結構化會話） |
