@@ -696,9 +696,11 @@ class CliApp:
         tokens = self.session.total_estimated_tokens()
         limit = self.session.max_context_tokens
         token_str = f"{tokens}/{limit}"
+        project_name = self.workspace_path.name or str(self.workspace_path)
 
         status_text = (
             f" {mode_badge} "
+            f"<b>Project:</b> <style fg='ansibrightyellow'>{project_name}</style> | "
             f"<b>Provider:</b> <style fg='ansigreen'>{self.provider_name}</style> | "
             f"<b>Model:</b> <style fg='ansicyan'>{self.model}</style> | "
             f"<b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
@@ -722,9 +724,11 @@ class CliApp:
         tokens = self.session.total_estimated_tokens()
         limit = self.session.max_context_tokens
         token_str = f"{tokens}/{limit}"
+        project_name = self.workspace_path.name or str(self.workspace_path)
 
         console.print(
             f"{mode_badge} "
+            f"[bold]Project:[/bold] [bright_yellow]{project_name}[/bright_yellow] | "
             f"[bold]Provider:[/bold] [green]{self.provider_name}[/green] | "
             f"[bold]Model:[/bold] [cyan]{self.model}[/cyan] | "
             f"[bold]Context:[/bold] [yellow]{token_str}[/yellow] | "
