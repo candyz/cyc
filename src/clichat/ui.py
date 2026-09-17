@@ -48,6 +48,8 @@ class CommandCompleter(Completer):
             "/tokens",
             "/mode",
             "/tools",
+            "/sessions",
+            "/resume",
             "/multiline",
             "/save",
             "/load",
@@ -101,9 +103,33 @@ class TerminalUI:
         title = f"[bold green]clichat[/bold green] [dim]v{__version__}[/dim]"
         body = (
             f"Provider: [bold cyan]{provider}[/bold cyan]  |  Model: [bold cyan]{model}[/bold cyan]  |  {mode_label}  |  {ml_label}\n"
-            f"[dim]Commands: /help, /mode [chat|agent], /tools, /models, /model <name>, /provider <name>, /exit[/dim]"
+            f"[dim]Commands: /help, /mode [chat|agent], /tools, /sessions, /resume, /models, /model <name>, /provider <name>, /exit[/dim]"
         )
         self.console.print(Panel(body, title=title, border_style="cyan" if mode == "chat" else "magenta", box=ROUNDED))
+
+    def print_sessions_table(self, sessions: List[Dict]):
+        table = Table(title=f"Saved Chat & Agent Sessions ({len(sessions)})", box=ROUNDED)
+        table.add_column("Session ID", style="bold cyan")
+        table.add_column("Mode", justify="center")
+        table.add_column("Provider / Model", style="green")
+        table.add_column("Msgs", justify="right")
+        table.add_column("Last Updated", style="dim")
+        table.add_column("Latest Preview", style="dim", max_width=40, overflow="ellipsis")
+
+        import datetime
+        for s in sessions:
+            m_time = datetime.datetime.fromtimestamp(s["updated_at"]).strftime("%Y-%m-%d %H:%M")
+            mode_badge = "[magenta]AGENT[/magenta]" if s.get("mode") == "agent" else "[cyan]CHAT[/cyan]"
+            prov_model = f"{s.get('provider', '-')}/{s.get('model', '-')}"
+            table.add_row(
+                s["session_id"],
+                mode_badge,
+                prov_model,
+                str(s.get("message_count", 0)),
+                m_time,
+                s.get("preview", ""),
+            )
+        self.console.print(table)
 
     def print_tools_table(self, tools: List[Any]):
         table = Table(title=f"Registered Agent Tools ({len(tools)})", box=ROUNDED)

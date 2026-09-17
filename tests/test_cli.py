@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from clichat.cli import parse_args, async_main, CliApp
 from clichat.config import load_config
+from clichat.session import SessionManager
 
 def test_parse_args_defaults():
     with patch.object(sys, "argv", ["clichat"]):
@@ -114,3 +115,48 @@ def test_status_toolbar():
     app.mode = "agent"
     toolbar_html_agent = app._get_status_toolbar()
     assert "AGENT" in toolbar_html_agent.value
+
+
+@pytest.mark.asyncio
+async def test_sessions_and_resume_slash_commands(tmp_path: Path):
+    sessions_dir = tmp_path / "sessions"
+    config = load_config(Path("/nonexistent"))
+
+    # Create dummy session
+    s1 = SessionManager(
+        session_id="saved_session_xyz",
+        provider="ollama",
+        model="llama3.3",
+        mode="agent",
+        sessions_dir=sessions_dir,
+    )
+    s1.add_user_message("Test question")
+    s1.add_assistant_message("Test answer")
+
+    app = CliApp(config, provider_name="ollama")
+
+    with patch("clichat.session.DEFAULT_SESSIONS_DIR", sessions_dir):
+        # /sessions
+        handled_sessions = await app.handle_slash_command("/sessions")
+        assert handled_sessions is True
+
+        # /resume with id
+        handled_resume = await app.handle_slash_command("/resume saved_session_xyz")
+        assert handled_resume is True
+        assert app.session.session_id == "saved_session_xyz"
+        assert len(app.session.messages) == 2
+        assert app.mode == "agent"
+
+
+def test_parse_args_resume_and_sessions():
+    with patch.object(sys, "argv", ["clichat", "-r"]):
+        args = parse_args()
+        assert args.resume == "LATEST"
+
+    with patch.object(sys, "argv", ["clichat", "--resume", "my_session_123"]):
+        args = parse_args()
+        assert args.resume == "my_session_123"
+
+    with patch.object(sys, "argv", ["clichat", "--sessions"]):
+        args = parse_args()
+        assert args.sessions is True

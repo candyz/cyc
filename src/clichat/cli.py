@@ -33,13 +33,23 @@ class CliApp:
         model_name: Optional[str] = None,
         mode: str = "chat",
         permission_mode: PermissionMode = PermissionMode.INTERACTIVE,
+        session: Optional[SessionManager] = None,
     ):
         self.config = config
         self.provider_name = provider_name or config.default_provider
         self.provider_config = config.get_provider(self.provider_name)
         self.model = model_name or self.provider_config.default_model or config.default_model
         self.provider: BaseProvider = create_provider(self.provider_config)
-        self.session = SessionManager()
+        self.session = session or SessionManager(
+            provider=self.provider_name,
+            model=self.model,
+            mode=mode,
+        )
+        # Ensure session metadata reflects current settings
+        self.session.provider = self.provider_name
+        self.session.model = self.model
+        self.session.mode = mode
+
         self.ui = TerminalUI(stream_markdown=config.ui.markdown_render)
         self.cached_models: List[str] = []
         self.multiline_mode: bool = False
@@ -56,7 +66,7 @@ class CliApp:
             permission_manager=self.permission_manager,
         )
 
-        if self.mode == "agent":
+        if self.mode == "agent" and not self.session.system_prompt:
             self.session.set_system_prompt(build_coding_agent_system_prompt())
 
     def get_known_models(self) -> List[str]:
@@ -130,6 +140,8 @@ class CliApp:
   /help               Show this help message
   /mode \[chat|agent] Switch or inspect interaction mode (chat or agent)
   /tools              List registered agent tools and descriptions
+  /sessions           List all saved chat & agent sessions
+  /resume [id]        Resume a previous session (or latest if omitted)
   /models             List available models for the active provider
   /model <name>       Switch active model (tab-completion supported)
   /provider <name>    Switch active provider (tab-completion supported)
@@ -140,6 +152,40 @@ class CliApp:
   /load <filepath>    Load previous conversation from a JSON file
   /clear              Clear current session history
   /exit or /quit      Exit CLI""")
+            return True
+        elif action == "/sessions":
+            sessions = SessionManager.list_sessions()
+            if sessions:
+                self.ui.print_sessions_table(sessions)
+                console.print("[dim]Use '/resume <session_id>' to switch to a previous session.[/dim]")
+            else:
+                console.print("[yellow]No saved sessions found.[/yellow]")
+            return True
+        elif action == "/resume":
+            if not arg:
+                # Resume latest session
+                loaded_session = SessionManager.get_latest_session()
+                if not loaded_session:
+                    console.print("[yellow]No saved sessions available to resume.[/yellow]")
+                    return True
+            else:
+                loaded_session = SessionManager.find_session(arg)
+                if not loaded_session:
+                    console.print(f"[bold red]Session not found matching:[/bold red] {arg}")
+                    return True
+
+            self.session = loaded_session
+            # Sync agent loop session
+            self.agent_loop.session = self.session
+            if self.session.mode and self.session.mode != self.mode:
+                self.mode = self.session.mode
+            if self.session.provider and self.session.provider in self.config.providers:
+                self.switch_provider(self.session.provider, self.session.model)
+            elif self.session.model:
+                self.model = self.session.model
+                self.agent_loop.model = self.model
+
+            console.print(f"[bold green]Resumed session:[/bold green] {self.session.session_id} ([cyan]{len(self.session.messages)} messages[/cyan], mode: [magenta]{self.mode}[/magenta])")
             return True
         elif action == "/mode":
             if not arg:
@@ -329,11 +375,23 @@ def parse_args():
     parser.add_argument("--agent", action="store_true", help="Enable autonomous Coding Agent mode")
     parser.add_argument("-y", "--yes", action="store_true", help="Auto-approve all tool actions without interactive prompt")
     parser.add_argument("--read-only", action="store_true", help="Block all mutation tools (write_file, replace, run_command)")
+    parser.add_argument("-r", "--resume", nargs="?", const="LATEST", help="Resume a previous session by ID/prefix (or latest if omitted)")
+    parser.add_argument("--sessions", action="store_true", help="List all saved chat & agent sessions and exit")
     return parser.parse_args()
 
 async def async_main():
     args = parse_args()
     config_path = Path(args.config) if args.config else None
+
+    # Handle '--sessions'
+    if args.sessions:
+        sessions = SessionManager.list_sessions()
+        ui = TerminalUI()
+        if sessions:
+            ui.print_sessions_table(sessions)
+        else:
+            console.print("[yellow]No saved sessions found.[/yellow]")
+        return
 
     # Handle 'clichat init' or 'clichat --init'
     is_init_cmd = args.init or (len(args.prompt) == 1 and args.prompt[0].lower() == "init")
@@ -352,8 +410,24 @@ async def async_main():
 
     config = load_config(config_path)
 
+    # Handle '--resume'
+    resumed_session: Optional[SessionManager] = None
+    if args.resume is not None:
+        if args.resume == "LATEST":
+            resumed_session = SessionManager.get_latest_session()
+            if not resumed_session:
+                console.print("[yellow]No previous sessions found to resume. Starting new session.[/yellow]")
+        else:
+            resumed_session = SessionManager.find_session(args.resume)
+            if not resumed_session:
+                console.print(f"[bold red]Session not found matching:[/bold red] {args.resume}. Starting new session.")
+
     # Determine mode and permissions
-    mode = "agent" if args.agent else "chat"
+    if resumed_session and resumed_session.mode and not args.agent:
+        mode = resumed_session.mode
+    else:
+        mode = "agent" if args.agent else "chat"
+
     if args.read_only:
         permission_mode = PermissionMode.READ_ONLY
     elif args.yes:
@@ -361,15 +435,23 @@ async def async_main():
     else:
         permission_mode = PermissionMode.INTERACTIVE
 
+    # Determine provider and model
+    provider_name = args.provider or (resumed_session.provider if resumed_session else None)
+    model_name = args.model or (resumed_session.model if resumed_session else None)
+
     app = CliApp(
         config,
-        provider_name=args.provider,
-        model_name=args.model,
+        provider_name=provider_name,
+        model_name=model_name,
         mode=mode,
         permission_mode=permission_mode,
+        session=resumed_session,
     )
     if args.system:
         app.session.set_system_prompt(args.system)
+
+    if resumed_session:
+        console.print(f"[bold green]Resumed session:[/bold green] {resumed_session.session_id} ([cyan]{len(resumed_session.messages)} messages[/cyan], mode: [magenta]{mode}[/magenta])")
 
     piped_input = ""
     if not sys.stdin.isatty():

@@ -65,3 +65,38 @@ def test_session_save_and_load_json(tmp_path: Path):
     assert len(loaded.messages) == 2
     assert loaded.messages[0]["content"] == "Save this test"
     assert loaded.messages[1]["content"] == "Saved reply"
+
+
+def test_session_auto_save_and_resume(tmp_path: Path):
+    sessions_dir = tmp_path / "sessions"
+    session1 = SessionManager(
+        session_id="test_sess_01",
+        provider="ollama",
+        model="llama3.3",
+        mode="agent",
+        sessions_dir=sessions_dir,
+    )
+    session1.add_user_message("First user prompt")
+    session1.add_assistant_message("First agent answer")
+
+    # Check auto-saved file
+    saved_file = sessions_dir / "test_sess_01.json"
+    assert saved_file.exists()
+
+    # Test list_sessions
+    all_sessions = SessionManager.list_sessions(sessions_dir=sessions_dir)
+    assert len(all_sessions) == 1
+    assert all_sessions[0]["session_id"] == "test_sess_01"
+    assert all_sessions[0]["mode"] == "agent"
+    assert all_sessions[0]["message_count"] == 2
+
+    # Test get_latest_session
+    latest = SessionManager.get_latest_session(sessions_dir=sessions_dir)
+    assert latest is not None
+    assert latest.session_id == "test_sess_01"
+    assert len(latest.messages) == 2
+
+    # Test find_session by prefix
+    found = SessionManager.find_session("test_sess", sessions_dir=sessions_dir)
+    assert found is not None
+    assert found.session_id == "test_sess_01"
