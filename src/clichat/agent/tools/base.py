@@ -1,5 +1,6 @@
+import re
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 class Tool(ABC):
     name: str
@@ -85,3 +86,68 @@ def truncate_tool_output(
             output = output[:max_chars] + f"\n\n... [Output truncated to {max_chars} characters] ..."
 
     return output
+
+def enrich_tool_error_observation(tool_name: str, observation: str, arguments: Optional[Dict[str, Any]] = None) -> str:
+    """Enrich tool error observations with intelligent diagnostic recovery hints.
+
+    Provides actionable guidance for LLMs when tools fail due to common errors
+    (missing files, non-unique target strings in replace_file_content, unrecognized tools, permission denied, command exit errors).
+    """
+    if not observation or not isinstance(observation, str):
+        return observation
+
+    args = arguments or {}
+    lower_obs = observation.lower()
+
+    # Only provide recovery advice if it's an error observation
+    is_err = lower_obs.startswith("error") or "error:" in lower_obs or "exit code: " in lower_obs
+
+    if not is_err:
+        return observation
+
+    hints: List[str] = []
+
+    # 1. Unrecognized / Unknown tool
+    if "is not recognized" in lower_obs:
+        hints.append("Suggested Action: Check available tools with proper naming (e.g. read_file, write_file, replace_file_content, run_command, run_script, list_dir, grep_search). Do not invent unregistered tool names.")
+
+    # 2. replace_file_content specific errors
+    elif "target text not found" in lower_obs:
+        hints.append("Suggested Action: Exact match failed. Call `read_file` to view the latest lines, check exact whitespace and indentation, and retry with the exact verbatim snippet.")
+
+    elif "found" in lower_obs and "times" in lower_obs and tool_name == "replace_file_content":
+        hints.append("Suggested Action: The replacement target is ambiguous. Include 2-3 additional lines of surrounding context (or function/class signature) above and below to make the target block unique.")
+
+    # 3. Path is a directory when a file was expected
+    elif "is a directory, not a file" in lower_obs or "is a directory" in lower_obs:
+        hints.append("Suggested Action: The target is a folder. Use `list_dir(path=...)` instead of `read_file` to inspect its contents.")
+
+    # 4. File does not exist / not found
+    elif "does not exist" in lower_obs or "no such file or directory" in lower_obs or "file not found" in lower_obs:
+        target_path = args.get("path") or args.get("file") or args.get("cwd") or ""
+        if target_path:
+            hints.append(f"Suggested Action: The path '{target_path}' could not be found. Use `list_dir` to inspect the directory structure or `grep_search` to verify the actual location and filename.")
+        else:
+            hints.append("Suggested Action: Verify the path by calling `list_dir` or `grep_search` before attempting to access or edit it.")
+
+    # 5. Permission denied by user or system
+    elif "permission was denied" in lower_obs or "permission denied" in lower_obs or "denied by the user" in lower_obs:
+        hints.append("Suggested Action: Explain to the user why this action was necessary, and either propose an alternative read-only/non-mutating approach or request permission explicitly.")
+
+    # 6. Non-zero command exit code or execution failure
+    elif "exit code: " in lower_obs:
+        # Check if exit code is non-zero
+        m = re.search(r"exit code:\s*(\d+)", lower_obs)
+        if m and m.group(1) != "0":
+            code = m.group(1)
+            hints.append(f"Suggested Action: The command failed with exit code {code}. Carefully review stderr above, check syntax or missing dependencies/flags, and adjust command parameters.")
+
+    # 7. Command timed out
+    elif "timed out after" in lower_obs:
+        hints.append("Suggested Action: The command took too long to complete. Consider specifying a larger `timeout` parameter or running with background/non-interactive flags.")
+
+    if hints:
+        recovery_text = "\n\n[Diagnostic Self-Repair Hint]\n" + "\n".join(f"• {h}" for h in hints)
+        return observation + recovery_text
+
+    return observation

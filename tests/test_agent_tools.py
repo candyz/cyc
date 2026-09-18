@@ -148,3 +148,38 @@ def test_truncate_tool_output():
     assert "(20000 head / 8000 tail preserved)" in truncated_chars
     assert truncated_chars.startswith("A" * 20_000)
     assert truncated_chars.endswith("A" * 8_000)
+
+def test_enrich_tool_error_observation():
+    from clichat.agent.tools.base import enrich_tool_error_observation
+
+    # 1. Success observation is not modified
+    success = "Successfully wrote 120 bytes to file.txt"
+    assert enrich_tool_error_observation("write_file", success) == success
+
+    # 2. Unrecognized tool hint
+    unrecognized = "Error: Tool 'magic_wand' is not recognized."
+    enriched_unrec = enrich_tool_error_observation("magic_wand", unrecognized)
+    assert "[Diagnostic Self-Repair Hint]" in enriched_unrec
+    assert "Do not invent unregistered tool names" in enriched_unrec
+
+    # 3. File not found hint
+    not_found = "Error: File 'missing.py' does not exist."
+    enriched_nf = enrich_tool_error_observation("read_file", not_found, {"path": "missing.py"})
+    assert "[Diagnostic Self-Repair Hint]" in enriched_nf
+    assert "Use `list_dir` to inspect the directory structure" in enriched_nf
+    assert "missing.py" in enriched_nf
+
+    # 4. replace_file_content target not found
+    target_nf = "Error: Target text not found in 'foo.py'."
+    enriched_tnf = enrich_tool_error_observation("replace_file_content", target_nf, {"path": "foo.py"})
+    assert "Call `read_file` to view the latest lines" in enriched_tnf
+
+    # 5. replace_file_content multiple matches
+    dup_target = "Error: Target text found 3 times in 'foo.py'."
+    enriched_dup = enrich_tool_error_observation("replace_file_content", dup_target, {"path": "foo.py"})
+    assert "Include 2-3 additional lines of surrounding context" in enriched_dup
+
+    # 6. Command non-zero exit code
+    exit_err = "Exit Code: 127\n\n[stderr]\ncommand not found"
+    enriched_cmd = enrich_tool_error_observation("run_command", exit_err, {"command": "foobar"})
+    assert "The command failed with exit code 127" in enriched_cmd

@@ -208,3 +208,42 @@ def test_session_sanitize_cancelled_state():
     assert session.messages[3]["role"] == "tool"
     assert session.messages[3]["tool_call_id"] == "tc_2"
     assert "Tool execution cancelled" in session.messages[3]["content"]
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_enriches_tool_error(tmp_path):
+    provider = MockAgentProvider([
+        # Turn 1: Model tries to read non-existent file
+        AgentTurnResponse(
+            content="Reading nonexistent file",
+            tool_calls=[
+                ToolCallRequest(
+                    id="call_err_1",
+                    name="read_file",
+                    arguments={"path": str(tmp_path / "ghost_file.txt")},
+                )
+            ],
+        ),
+        # Turn 2: Model recovers and completes
+        AgentTurnResponse(
+            content="Acknowledged file does not exist.",
+            tool_calls=[],
+        ),
+    ])
+
+    registry = ToolRegistry([ReadFileTool()])
+    session = SessionManager()
+    loop = AgentLoop(
+        provider=provider,
+        model="mock-model",
+        session=session,
+        tool_registry=registry,
+        permission_manager=PermissionManager(PermissionMode.AUTO),
+    )
+
+    await loop.run_turn("Inspect ghost file")
+    # Verify tool message contains diagnostic self-repair hint
+    tool_msg = session.messages[2]
+    assert tool_msg["role"] == "tool"
+    assert "[Diagnostic Self-Repair Hint]" in tool_msg["content"]
+    assert "Use `list_dir` to inspect the directory structure" in tool_msg["content"]

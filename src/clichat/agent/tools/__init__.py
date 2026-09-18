@@ -1,5 +1,5 @@
 from typing import Dict, List
-from clichat.agent.tools.base import Tool, truncate_tool_output
+from clichat.agent.tools.base import Tool, truncate_tool_output, enrich_tool_error_observation
 from clichat.agent.tools.filesystem import (
     ReadFileTool,
     WriteFileTool,
@@ -48,6 +48,7 @@ class ToolRegistry:
 __all__ = [
     "Tool",
     "truncate_tool_output",
+    "enrich_tool_error_observation",
     "ToolRegistry",
     "get_default_tools",
     "ReadFileTool",

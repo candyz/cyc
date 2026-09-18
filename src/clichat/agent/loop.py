@@ -6,7 +6,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from clichat.agent.permissions import PermissionManager
-from clichat.agent.tools import ToolRegistry, truncate_tool_output
+from clichat.agent.tools import ToolRegistry, truncate_tool_output, enrich_tool_error_observation
 from clichat.providers.base import AgentTurnResponse, BaseProvider
 from clichat.providers.gemini import GeminiProvider
 from clichat.session import SessionManager
@@ -138,6 +138,9 @@ class AgentLoop:
                             raise
                         except Exception as e:
                             observation = f"Error executing tool '{tc.name}': {e}"
+
+                        # Enrich error observations with intelligent diagnostic recovery hints
+                        observation = enrich_tool_error_observation(tc.name, observation, tc.arguments)
 
                         # Append tool result to session
                         self.session.add_tool_message(
