@@ -41,6 +41,7 @@ class UIConfig(BaseModel):
 class AgentConfig(BaseModel):
     max_turns: int = 100
     compact_threshold: float = 0.80
+    searxng_url: str = "https://searx.be"
 
 class Config(BaseModel):
     default_provider: str = "ollama"
@@ -102,6 +103,7 @@ DEFAULT_CONFIG_DICT = {
     "agent": {
         "max_turns": 100,
         "compact_threshold": 0.80,
+        "searxng_url": "https://searx.be",
     },
     "ui": {
         "theme": "monokai",

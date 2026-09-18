@@ -11,6 +11,8 @@ from clichat.agent.tools import (
     RunScriptTool,
     ListDirTool,
     GrepSearchTool,
+    WebSearchTool,
+    FetchUrlTool,
 )
 from clichat.agent.permissions import PermissionManager, PermissionMode
 from clichat.agent.prompt import build_coding_agent_system_prompt
@@ -30,6 +32,8 @@ __all__ = [
     "RunScriptTool",
     "ListDirTool",
     "GrepSearchTool",
+    "WebSearchTool",
+    "FetchUrlTool",
     "PermissionManager",
     "PermissionMode",
     "build_coding_agent_system_prompt",

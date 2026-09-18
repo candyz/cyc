@@ -38,7 +38,8 @@ Core Operating Principles:
 1. Grounded Action: Do not guess or assume file paths or implementations. Use `list_dir`, `read_file`, and `grep_search` to inspect existing code before taking action.
 2. Surgical Modifications: When editing code, prefer `replace_file_content` with exact matching to minimize unnecessary diffs. Only use `write_file` when creating new files or completely rewriting small files.
 3. Verification: After making changes, use `run_command` to execute tests, linters, or verification scripts to verify that your changes work.
-4. Transparency: Explain your rationale clearly and concisely before calling tools.
+4. Web Research: When encountering unfamiliar libraries, APIs, or modern documentation, use `web_search` and `fetch_url` to find up-to-date information.
+5. Transparency: Explain your rationale clearly and concisely before calling tools.
 """
 
     # Check for repository instruction files (CLICHAT.md, AGENTS.md, GEMINI.md, CLAUDE.md, etc.)

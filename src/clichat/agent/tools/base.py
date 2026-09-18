@@ -146,6 +146,15 @@ def enrich_tool_error_observation(tool_name: str, observation: str, arguments: O
     elif "timed out after" in lower_obs:
         hints.append("Suggested Action: The command took too long to complete. Consider specifying a larger `timeout` parameter or running with background/non-interactive flags.")
 
+    # 8. Web search or URL fetch error
+    elif tool_name in ("web_search", "fetch_url"):
+        if "invalid url" in lower_obs:
+            hints.append("Suggested Action: Ensure the URL starts with 'http://' or 'https://' and has a valid domain name.")
+        elif "timed out" in lower_obs or "timeout" in lower_obs:
+            hints.append("Suggested Action: The web request timed out. Check network connectivity or specify a longer `timeout` parameter.")
+        else:
+            hints.append("Suggested Action: Web resource could not be reached. Consider refining search keywords, trying an alternative search query, or checking the domain.")
+
     if hints:
         recovery_text = "\n\n[Diagnostic Self-Repair Hint]\n" + "\n".join(f"• {h}" for h in hints)
         return observation + recovery_text

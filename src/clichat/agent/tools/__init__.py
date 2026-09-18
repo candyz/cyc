@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from clichat.agent.tools.base import Tool, truncate_tool_output, enrich_tool_error_observation
 from clichat.agent.tools.filesystem import (
     ReadFileTool,
@@ -8,9 +8,10 @@ from clichat.agent.tools.filesystem import (
 )
 from clichat.agent.tools.command import RunCommandTool, RunScriptTool
 from clichat.agent.tools.search import GrepSearchTool
+from clichat.agent.tools.web import WebSearchTool, FetchUrlTool
 
-def get_default_tools() -> List[Tool]:
-    """Return an instantiated list of all 7 core built-in tools."""
+def get_default_tools(searxng_url: Optional[str] = None) -> List[Tool]:
+    """Return an instantiated list of all 9 core built-in tools."""
     return [
         ReadFileTool(),
         WriteFileTool(),
@@ -19,6 +20,8 @@ def get_default_tools() -> List[Tool]:
         RunScriptTool(),
         ListDirTool(),
         GrepSearchTool(),
+        WebSearchTool(searxng_url=searxng_url),
+        FetchUrlTool(),
     ]
 
 class ToolRegistry:
@@ -58,4 +61,6 @@ __all__ = [
     "RunScriptTool",
     "ListDirTool",
     "GrepSearchTool",
+    "WebSearchTool",
+    "FetchUrlTool",
 ]

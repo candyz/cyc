@@ -16,6 +16,7 @@ from clichat.agent import (
     PermissionManager,
     PermissionMode,
     ToolRegistry,
+    get_default_tools,
     WorkspaceTrustManager,
     build_coding_agent_system_prompt,
     StdioMCPClient,
@@ -79,7 +80,8 @@ class CliApp:
         if self.is_workspace_trusted is False:
             effective_perm_mode = PermissionMode.READ_ONLY
 
-        self.tool_registry = ToolRegistry()
+        searxng_url = getattr(getattr(self.config, "agent", None), "searxng_url", None)
+        self.tool_registry = ToolRegistry(get_default_tools(searxng_url=searxng_url))
         self.permission_manager = PermissionManager(effective_perm_mode)
         self.mcp_clients: List[StdioMCPClient] = []
         default_max_turns = getattr(getattr(self.config, "agent", None), "max_turns", 100)

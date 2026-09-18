@@ -9,6 +9,8 @@ from clichat.agent.tools import (
     RunCommandTool,
     ListDirTool,
     GrepSearchTool,
+    WebSearchTool,
+    FetchUrlTool,
 )
 
 @pytest.mark.asyncio
@@ -106,21 +108,87 @@ async def test_grep_search(tmp_path: Path):
 
 def test_tool_registry():
     registry = ToolRegistry()
-    assert len(registry.all_tools()) == 7
+    assert len(registry.all_tools()) == 9
 
     openai_tools = registry.to_openai_tools()
-    assert len(openai_tools) == 7
+    assert len(openai_tools) == 9
     names = [t["function"]["name"] for t in openai_tools]
     assert "read_file" in names
     assert "write_file" in names
     assert "run_command" in names
     assert "run_script" in names
+    assert "web_search" in names
+    assert "fetch_url" in names
 
     gemini_tools = registry.to_gemini_tools()
-    assert len(gemini_tools) == 7
+    assert len(gemini_tools) == 9
     gemini_names = [t["name"] for t in gemini_tools]
     assert "replace_file_content" in gemini_names
-    assert "run_script" in gemini_names
+    assert "web_search" in gemini_names
+    assert "fetch_url" in gemini_names
+
+@pytest.mark.asyncio
+async def test_fetch_url_tool():
+    tool = FetchUrlTool()
+
+    # Invalid URL
+    res_err = await tool.execute(url="ftp://invalid.com")
+    assert "Error: Invalid URL" in res_err
+
+    # Mock fetching valid URL
+    sample_html = """
+    <html>
+        <head><title>Test Page</title><style>body { color: red; }</style></head>
+        <body>
+            <h1>Documentation Header</h1>
+            <p>This is a paragraph with <a href="#">link</a>.</p>
+            <script>console.log("ignore me");</script>
+        </body>
+    </html>
+    """
+    from unittest.mock import patch, MagicMock
+
+    mock_resp = MagicMock()
+    mock_resp.headers = {"Content-Type": "text/html; charset=utf-8"}
+    mock_resp.read = MagicMock(return_value=sample_html.encode("utf-8"))
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=False)
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        res = await tool.execute(url="https://example.com/docs")
+        assert "Documentation Header" in res
+        assert "This is a paragraph" in res
+        assert "console.log" not in res
+        assert "color: red" not in res
+
+@pytest.mark.asyncio
+async def test_web_search_tool():
+    tool = WebSearchTool(searxng_url="https://mock.searx.test")
+
+    # Empty query
+    empty_res = await tool.execute(query="")
+    assert "Error: Search query cannot be empty" in empty_res
+
+    # Mock SearXNG JSON response
+    mock_json = """{
+        "query": "python async",
+        "results": [
+            {"title": "Async IO in Python", "url": "https://python.org/async", "content": "Comprehensive asyncio guide."},
+            {"title": "Python Async Tutorial", "url": "https://tutorial.org", "content": "Learn async programming."}
+        ]
+    }"""
+
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.read = MagicMock(return_value=mock_json.encode("utf-8"))
+    mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+    mock_resp.__exit__ = MagicMock(return_value=False)
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        res = await tool.execute(query="python async", num_results=2)
+        assert "Async IO in Python" in res
+        assert "https://python.org/async" in res
+        assert "Comprehensive asyncio guide." in res
 
 def test_truncate_tool_output():
     from clichat.agent.tools.base import truncate_tool_output
