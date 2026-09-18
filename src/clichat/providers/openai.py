@@ -1,7 +1,7 @@
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from openai import AsyncOpenAI
-from clichat.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest
+from clichat.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest, retry_async
 
 class OpenAICompatibleProvider(BaseProvider):
     def __init__(self, base_url: str, api_key: str):
@@ -18,12 +18,15 @@ class OpenAICompatibleProvider(BaseProvider):
         model: str,
         **kwargs
     ) -> AsyncGenerator[str, None]:
-        response = await self.client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-            **kwargs,
-        )
+        async def _call():
+            return await self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+                **kwargs,
+            )
+
+        response = await retry_async(_call, retry_label=f"OpenAI/v1 stream ({model})")
         async for chunk in response:
             if not chunk.choices:
                 continue
@@ -47,7 +50,10 @@ class OpenAICompatibleProvider(BaseProvider):
         if tools:
             payload_kwargs["tools"] = tools
 
-        response = await self.client.chat.completions.create(**payload_kwargs)
+        async def _call():
+            return await self.client.chat.completions.create(**payload_kwargs)
+
+        response = await retry_async(_call, retry_label=f"OpenAI/v1 tool call ({model})")
         choice = response.choices[0]
         msg = choice.message
 

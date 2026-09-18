@@ -2,7 +2,7 @@ import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from google import genai
 from google.genai import types
-from clichat.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest
+from clichat.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest, retry_async
 
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):
@@ -52,11 +52,14 @@ class GeminiProvider(BaseProvider):
             system_instruction=system_instruction,
         )
 
-        response = await self.client.aio.models.generate_content_stream(
-            model=model,
-            contents=contents,
-            config=config,
-        )
+        async def _call():
+            return await self.client.aio.models.generate_content_stream(
+                model=model,
+                contents=contents,
+                config=config,
+            )
+
+        response = await retry_async(_call, retry_label=f"Gemini stream ({model})")
 
         async for chunk in response:
             if chunk.text:
@@ -93,11 +96,14 @@ class GeminiProvider(BaseProvider):
             tools=gemini_tools,
         )
 
-        response = await self.client.aio.models.generate_content(
-            model=model,
-            contents=contents,
-            config=config,
-        )
+        async def _call():
+            return await self.client.aio.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config,
+            )
+
+        response = await retry_async(_call, retry_label=f"Gemini tool call ({model})")
 
         parsed_calls: List[ToolCallRequest] = []
         if response.function_calls:
