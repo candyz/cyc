@@ -15,7 +15,7 @@ Supports:
   5. Codex / Hermes:
      - ~/.codex/skills/
      - ~/.hermes/skills/
-  6. Standard Clichat Global directory:
+  6. Standard Cyc Global directory:
      - ~/.config/cyc/skills/
   7. User-configured custom paths via config.yaml (`skills_dirs`)
   8. Workspace-level project skills:

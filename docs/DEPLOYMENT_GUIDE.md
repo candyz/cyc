@@ -115,6 +115,12 @@ providers:
     api_key: "${NVIDIA_API_KEY}"
     default_model: "meta/llama-3.3-70b-instruct"
 
+# Agent 核心設定
+agent:
+  max_turns: 100                  # Agent 單次任務最大決策回合上限
+  compact_threshold: 0.80         # 當上下文達到 80% 時自動啟動 Compact 壓縮
+  searxng_url: "http://192.168.10.4:8080" # SearXNG 搜尋實例位址 (亦可透過環境變數 SEARXNG_URL 指定)
+
 # MCP 外部工具伺服器掛載 (Model Context Protocol)
 mcp_servers:
   filesystem:

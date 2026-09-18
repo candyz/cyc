@@ -56,20 +56,30 @@ cyc
 
 
 - **Autonomous Coding Agent (自主編程代理)**：
-  - 核心工具：`read_file`, `write_file`, `replace_file_content`, `run_command`, `list_dir`, `grep_search`。
+  - 核心工具：`read_file`, `write_file`, `replace_file_content`, `run_command`, `list_dir`, `grep_search`, `web_search`, `fetch_url`。
+  - **原生 Web Search & Fetch**：內建 `web_search`（支援 SearXNG 隱私搜尋引擎）與 `fetch_url`（智慧抽取網頁乾淨內文與 Markdown，並自動截斷防爆）。
   - **PTC (Programmatic Tool-Calling)**：透過 `run_script` 支援以單一 Turn 執行 Python / Bash 多步驟腳本與管線運算，顯著節省推論輪次。
   - **可插拔 Loop 策略**：支援 `/loop` 動態切換 `standard` (15 輪 ReAct)、`plan` (先規劃後執行)、`minimal` (3 輪評測/快跑)。
+  - **強韌性與自我修復**：
+    - **工具輸出超大防爆 (Auto Truncate Big Output)**：保留首尾關鍵內容，防止巨大輸出衝垮上下文視窗。
+    - **Ctrl+C 優雅中斷 (Graceful Cancel)**：子進程即時清理、自動消毒 session 狀態符合 API schema，REPL 不會崩潰中斷。
+    - **API 指數退避重試 (Retry on 429/5xx)**：面對 Rate limit 與伺服器短暫異常，自動以 Jitter 演算法重試。
+    - **Tool Error 智能自我修復提示**：工具發生錯誤時自動注入診斷修復建議，引導模型自我更正。
   - **Event-Sourced 與 Session 分支**：全面支援 Append-only `.events.jsonl` 事件源追蹤，並可使用 `/fork` 即時分岔會話實驗分支。
   - **標準 Agent Skills 支援**：支援標準 `<skill_name>/SKILL.md`（YAML frontmatter 與 scripts/references 等子目錄）及單檔 `.md`。自動跨工具探索 Google Antigravity、Claude Code、OpenCode、全域及專案工作區技能。
   - **多代理對話相容**：無縫列出與接續 agy (`gemini`), claude code, pi, opencode 等代理之歷史會話 (`/sessions`, `/resume`)。
+- **本地 Shell 快捷執行**：
+  - 在 REPL 中隨時輸入 `!<command>`（如 `!git status`、`!ls -la`）即可直接非同步執行本地終端指令，並支援 `Ctrl+C` 即時中止。
 - **安全與信任機制**：
   - 專案工作區信任管理 (`/trust [show|allow|deny]`)，首次執行提示授權，限制未信任目錄為唯讀模式。
   - 差異比對預覽：修改檔案時自動生成彩色 Unified Diff 並可互動確認。
   - 支援一鍵還原回退 (`/undo`)，連帶可還原 git uncommitted 修改。
 
-## Slash Commands (在 REPL 模式下)
+## Slash Commands 與快捷鍵 (在 REPL 模式下)
 
-| 指令 | 說明 |
+| 指令 / 快捷鍵 | 說明 |
+| :--- | :--- |
+| `!<command>` | 本地終端快速執行指令（例如 `!git status`、`!uv run pytest`） |
 | :--- | :--- |
 | `/help` | 顯示所有指令說明 |
 | `/mode <mode>` | 切換交談模式 (chat) 或自主代理模式 (agent) |

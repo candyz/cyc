@@ -92,6 +92,8 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `run_script` | 變更 | **PTC 模式**：執行多行 Python 或 Bash 腳本，單回合批次處理 |
 | `list_dir` | 唯讀 | 列出目錄樹狀結構、檔案大小與屬性 |
 | `grep_search` | 唯讀 | 在專案內使用正則表達式快速檢索文字與程式碼符號 |
+| `web_search` | 唯讀 | **聯網搜尋**：連接 SearXNG 實例進行隱私且即時的網路資訊檢索 |
+| `fetch_url` | 唯讀 | **網頁擷取**：抓取 URL 網頁內容，智慧提取乾淨文字/Markdown 並自動截斷防爆 |
 | `MCP Tools` | 擴充 | 透過 Model Context Protocol 動態掛載之外部工具 |
 
 ---
@@ -163,6 +165,39 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
   /sync claude       # 明確指定寫回為 Claude Code 會話
   ```
 
+### 4.7 原生聯網搜尋與網頁擷取 (Web Search & Fetch)
+`cyc` 內建開箱即用的聯網查詢與資料抓取能力，無需額外配置複雜外掛：
+- **`web_search` (SearXNG 整合)**：
+  - 預設可連接自架或區域網路內的 SearXNG 實例（例如 `http://192.168.10.4:8080`），亦可於 `config.yaml` 或環境變數 `SEARXNG_URL` 自訂。
+  - 模型可指定查詢關鍵字 `query` 與數量 `max_results`（預設 5 筆），系統回傳標題、URL 與精簡內文摘要，供 Agent 作為事實查核與最新資訊參考。
+- **`fetch_url` (智慧網頁抽取)**：
+  - 給定任意 HTTP/HTTPS 網址，系統自動抓取 HTML 並以純 Python 正則將其清洗為結構化純文字 / Markdown 內容（自動過濾 `<script>`、`<style>`、`<nav>` 等雜訊標籤）。
+  - 支援 `max_chars` 限制（預設 8,000 字元，上限 30,000 字元），搭配防爆截斷機制，保障上下文視窗安全。
+
+### 4.8 本地快捷 Shell 執行 (`!<command>`)
+在 REPL 互動環境中，想要快速查看本地狀態（例如 Git、檔案清單或環境變數）而無需讓 Agent 進入推論循環：
+- 直接在輸入開頭加上驚嘆號 `!`，例如：
+  ```bash
+  > !git status
+  > !ls -la src/cyc
+  > !uv run pytest
+  ```
+- 系統會直接以非同步子進程執行，即時印出 stdout/stderr，且按下 `Ctrl+C` 可立即終止子進程而不會退出 `cyc`。
+
+### 4.9 系統強韌性與自我修復防護機制 (Stability & Resilience)
+為確保長時間自主代理循環不崩潰、不爆上下文，`cyc` 提供全方位的防護網絡：
+1. **工具輸出超大防爆 (Auto Truncate Big Output)**：
+   - 當工具呼叫（如 `run_command`、`read_file`、`run_script`）產生海量輸出（例如 `npm test` 印出數萬行日誌）時，系統自動啟用 **Head + Tail 截斷策略**（保留前段與末段關鍵資訊，中間插入省略標記與字元統計），防止 context window 一擊被塞爆。
+2. **Ctrl+C 優雅中斷 (Graceful Cancellation in Agent Loop)**：
+   - 使用者在 Agent 思考或執行工具途中按下 `Ctrl+C` 時，系統不會直接異常跳出，而是：
+     - 即時發送 SIGKILL 終止當前運行的子進程。
+     - 自動呼叫 `sanitize_cancelled_state` 修復 Session 歷史（補齊 `[Cancelled by user]` 工具回傳），使上下文維持合法 API Schema，避免下一輪對話因「有 tool_calls 卻無對應 tool 訊息」報錯。
+3. **API 指數退避重試 (Exponential Backoff with Jitter)**：
+   - 自動捕捉 HTTP 429 (Rate Limit)、500、502、503、504 等瞬態錯誤。
+   - 預設進行最多 3 次重試，並加入 Full Jitter 隨機延遲，有效緩解高併發衝撞。
+4. **Tool Error 智能自我修復提示 (Diagnostic Self-Repair Hints)**：
+   - 當工具執行拋出常見錯誤（如 `FileNotFoundError`, `IsADirectoryError`, `SyntaxError`, `KeyError`, `PermissionError`, 指令逾時等）時，系統除了記錄原始錯誤訊息，還會自動在 Observation 末尾注入 `[Diagnostic Self-Repair Hint]`，指引模型「如何換用正確參數或替代工具重新嘗試」，顯著提升自主調錯成功率。
+
 ---
 
 ## 5. 安全與信任機制 (Security & Trust)
@@ -178,11 +213,13 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 
 ---
 
-## 6. 全指令一覽表 (Slash Commands)
+## 6. 全指令一覽表 (Slash Commands 與快捷鍵)
 
-在互動 REPL 環境中，輸入 `/` 即會彈出自動補全選單：
+在互動 REPL 環境中，輸入 `/` 即會彈出自動補全選單，輸入 `!` 可直接執行本地終端指令：
 
-| 指令 | 說明 |
+| 指令 / 快捷鍵 | 說明 |
+| :--- | :--- |
+| `!<command>` | 本地 Shell 快捷執行（例如 `!git status`、`!ls`） |
 | :--- | :--- |
 | `/help` | 顯示所有指令清單與格式說明 |
 | `/mode <mode>` | 切換或檢視互動模式 (`chat` 或 `agent`) |
