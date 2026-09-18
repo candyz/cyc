@@ -137,3 +137,74 @@ async def test_agent_loop_truncates_oversized_tool_output(tmp_path):
     tool_msg = session.messages[2]
     assert tool_msg["role"] == "tool"
     assert "... [Output truncated:" in tool_msg["content"] or "[Note: Output truncated" in tool_msg["content"]
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_graceful_cancellation():
+    from clichat.agent.tools.base import Tool
+
+    class HangingTool(Tool):
+        name = "hanging_tool"
+        description = "A tool that hangs or raises KeyboardInterrupt"
+        parameters = {"type": "object", "properties": {}}
+
+        async def execute(self, **kwargs) -> str:
+            raise KeyboardInterrupt()
+
+    provider = MockAgentProvider([
+        AgentTurnResponse(
+            content="Calling hanging tool",
+            tool_calls=[
+                ToolCallRequest(
+                    id="call_hang_1",
+                    name="hanging_tool",
+                    arguments={},
+                )
+            ],
+        ),
+    ])
+
+    registry = ToolRegistry([HangingTool()])
+    session = SessionManager()
+    loop = AgentLoop(
+        provider=provider,
+        model="mock-model",
+        session=session,
+        tool_registry=registry,
+        permission_manager=PermissionManager(PermissionMode.AUTO),
+    )
+
+    result = await loop.run_turn("Hang now")
+    assert result == "[Interrupted by user]"
+    # Check that session history is valid and the tool_call was safely sanitized
+    assert len(session.messages) == 3
+    assert session.messages[0]["role"] == "user"
+    assert session.messages[1]["role"] == "assistant"
+    assert session.messages[2]["role"] == "tool"
+    assert session.messages[2]["tool_call_id"] == "call_hang_1"
+    assert "Tool execution cancelled" in session.messages[2]["content"]
+
+
+def test_session_sanitize_cancelled_state():
+    session = SessionManager()
+    session.add_user_message("Do something")
+    # Simulate assistant message with 2 tool calls
+    session.messages.append({
+        "role": "assistant",
+        "content": "Running tools",
+        "tool_calls": [
+            {"id": "tc_1", "type": "function", "function": {"name": "tool_a", "arguments": "{}"}},
+            {"id": "tc_2", "type": "function", "function": {"name": "tool_b", "arguments": "{}"}},
+        ],
+    })
+    # Tool 1 succeeded, but Tool 2 was interrupted before it could run
+    session.add_tool_message("tc_1", "tool_a", "Result of tool 1")
+
+    # Sanitize
+    session.sanitize_cancelled_state(cancellation_note="Interrupted by user")
+
+    # Check that tc_2 was filled with a cancelled tool message
+    assert len(session.messages) == 4
+    assert session.messages[3]["role"] == "tool"
+    assert session.messages[3]["tool_call_id"] == "tc_2"
+    assert "Tool execution cancelled" in session.messages[3]["content"]

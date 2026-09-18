@@ -184,6 +184,54 @@ class SessionManager:
         self.auto_save()
         return True
 
+    def sanitize_cancelled_state(self, cancellation_note: str = "Interrupted by user (Ctrl+C)") -> None:
+        """Ensure message history remains valid for LLM APIs if interrupted during tool calls.
+
+        If the last assistant message contains unresolved tool calls that did not receive
+        corresponding tool responses before cancellation, append synthetic cancelled responses
+        so the API schema requirement (each tool_call must have a matching tool response) is satisfied.
+        """
+        if not self.messages:
+            return
+
+        # Check if the last assistant message has tool_calls
+        last_assistant_idx = None
+        for i in range(len(self.messages) - 1, -1, -1):
+            if self.messages[i].get("role") == "assistant":
+                last_assistant_idx = i
+                break
+
+        if last_assistant_idx is None:
+            return
+
+        assistant_msg = self.messages[last_assistant_idx]
+        tool_calls = assistant_msg.get("tool_calls")
+        if not tool_calls or not isinstance(tool_calls, list):
+            return
+
+        # Find which tool_call_ids were fulfilled in subsequent messages
+        fulfilled_ids = set()
+        for msg in self.messages[last_assistant_idx + 1:]:
+            if msg.get("role") == "tool" and msg.get("tool_call_id"):
+                fulfilled_ids.add(msg.get("tool_call_id"))
+
+        # For any unfulfilled tool_calls, add cancelled tool message
+        for tc in tool_calls:
+            tc_id = tc.get("id")
+            fn_info = tc.get("function", {})
+            name = fn_info.get("name", "unknown_tool")
+            if tc_id and tc_id not in fulfilled_ids:
+                self.messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "name": name,
+                    "content": f"[Tool execution cancelled: {cancellation_note}]",
+                })
+                fulfilled_ids.add(tc_id)
+
+        self.updated_at = time.time()
+        self.auto_save()
+
     def clear(self) -> None:
         self.messages.clear()
         self.history_checkpoints.clear()

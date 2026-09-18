@@ -198,6 +198,8 @@ class CliApp:
         if self.mode == "agent":
             try:
                 await self.agent_loop.run_turn(user_prompt)
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                pass
             except Exception as e:
                 console.print(f"\n[bold red]Agent Error:[/bold red] {e}")
             return
@@ -816,6 +818,9 @@ class CliApp:
                     try:
                         with self.fixed_status_bar_scroll_region():
                             await self.agent_loop.run_turn(user_input)
+                    except (KeyboardInterrupt, asyncio.CancelledError):
+                        # Graceful interrupt already handled inside agent_loop.run_turn
+                        pass
                     except Exception as e:
                         console.print(f"\n[bold red]Agent Error:[/bold red] {e}\n")
                     continue

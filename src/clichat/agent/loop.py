@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any, Dict, List, Optional
 from rich.console import Console
@@ -73,88 +74,99 @@ class AgentLoop:
         turn_count = 0
         final_content = ""
 
-        while turn_count < effective_max_turns:
-            turn_count += 1
+        try:
+            while turn_count < effective_max_turns:
+                turn_count += 1
 
-            # Prepare tool definitions suitable for provider
-            if isinstance(self.provider, GeminiProvider):
-                tools = self.tool_registry.to_gemini_tools()
-            else:
-                tools = self.tool_registry.to_openai_tools()
+                # Prepare tool definitions suitable for provider
+                if isinstance(self.provider, GeminiProvider):
+                    tools = self.tool_registry.to_gemini_tools()
+                else:
+                    tools = self.tool_registry.to_openai_tools()
 
-            # Query model with tool definitions
-            with console.status(f"[dim cyan]Agent thinking (turn {turn_count}/{effective_max_turns})...[/dim cyan]", spinner="dots"):
-                response: AgentTurnResponse = await self.provider.chat_with_tools(
-                    messages=self.session.get_messages(),
-                    model=self.model,
-                    tools=tools,
-                )
-
-            # Check if model wants to invoke tools
-            if response.has_tool_calls:
-                # Add assistant message with tool_calls structure to session
-                raw_tool_calls = [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.name,
-                            "arguments": json.dumps(tc.arguments, ensure_ascii=False),
-                        },
-                    }
-                    for tc in response.tool_calls
-                ]
-                self.session.messages.append({
-                    "role": "assistant",
-                    "content": response.content or "",
-                    "tool_calls": raw_tool_calls,
-                })
-
-                if response.content:
-                    if self.ui and hasattr(self.ui, "render_formatted_response"):
-                        self.ui.render_formatted_response(response.content)
-                    else:
-                        console.print(Markdown(response.content))
-
-                for tc in response.tool_calls:
-                    self._render_tool_call_card(tc.name, tc.arguments)
-
-                    try:
-                        tool = self.tool_registry.get(tc.name)
-                        permitted = await self.permission_manager.check_permission(tool, tc.arguments)
-                        if permitted:
-                            with console.status(f"[dim cyan]Executing tool: {tc.name}...[/dim cyan]", spinner="dots"):
-                                observation = await tool.execute(**tc.arguments)
-                            observation = truncate_tool_output(observation)
-                            self._render_tool_result_preview(tc.name, observation)
-                        else:
-                            observation = "Error: Execution of this tool was denied by the user."
-                    except KeyError:
-                        observation = f"Error: Tool '{tc.name}' is not recognized."
-                    except Exception as e:
-                        observation = f"Error executing tool '{tc.name}': {e}"
-
-                    # Append tool result to session
-                    self.session.add_tool_message(
-                        tool_call_id=tc.id,
-                        name=tc.name,
-                        content=observation,
+                # Query model with tool definitions
+                with console.status(f"[dim cyan]Agent thinking (turn {turn_count}/{effective_max_turns})...[/dim cyan]", spinner="dots"):
+                    response: AgentTurnResponse = await self.provider.chat_with_tools(
+                        messages=self.session.get_messages(),
+                        model=self.model,
+                        tools=tools,
                     )
 
-                # Loop continues with tool observations now in context
-                continue
+                # Check if model wants to invoke tools
+                if response.has_tool_calls:
+                    # Add assistant message with tool_calls structure to session
+                    raw_tool_calls = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments, ensure_ascii=False),
+                            },
+                        }
+                        for tc in response.tool_calls
+                    ]
+                    self.session.messages.append({
+                        "role": "assistant",
+                        "content": response.content or "",
+                        "tool_calls": raw_tool_calls,
+                    })
 
-            # Model did not call any tools -> final answer reached
-            final_content = response.content or ""
-            if final_content:
-                if self.ui and hasattr(self.ui, "render_formatted_response"):
-                    self.ui.render_formatted_response(final_content)
-                else:
-                    console.print(Markdown(final_content))
-                self.session.add_assistant_message(final_content)
-            break
+                    if response.content:
+                        if self.ui and hasattr(self.ui, "render_formatted_response"):
+                            self.ui.render_formatted_response(response.content)
+                        else:
+                            console.print(Markdown(response.content))
 
-        if turn_count >= self.max_turns:
-            console.print(f"[bold yellow]Warning: Reached maximum agent loop limit ({self.max_turns} turns).[/bold yellow]")
+                    for tc in response.tool_calls:
+                        self._render_tool_call_card(tc.name, tc.arguments)
 
-        return final_content
+                        try:
+                            tool = self.tool_registry.get(tc.name)
+                            permitted = await self.permission_manager.check_permission(tool, tc.arguments)
+                            if permitted:
+                                with console.status(f"[dim cyan]Executing tool: {tc.name}...[/dim cyan]", spinner="dots"):
+                                    observation = await tool.execute(**tc.arguments)
+                                observation = truncate_tool_output(observation)
+                                self._render_tool_result_preview(tc.name, observation)
+                            else:
+                                observation = "Error: Execution of this tool was denied by the user."
+                        except KeyError:
+                            observation = f"Error: Tool '{tc.name}' is not recognized."
+                        except (asyncio.CancelledError, KeyboardInterrupt):
+                            # Propagate cancellation to outer loop handler
+                            raise
+                        except Exception as e:
+                            observation = f"Error executing tool '{tc.name}': {e}"
+
+                        # Append tool result to session
+                        self.session.add_tool_message(
+                            tool_call_id=tc.id,
+                            name=tc.name,
+                            content=observation,
+                        )
+
+                    # Loop continues with tool observations now in context
+                    continue
+
+                # Model did not call any tools -> final answer reached
+                final_content = response.content or ""
+                if final_content:
+                    if self.ui and hasattr(self.ui, "render_formatted_response"):
+                        self.ui.render_formatted_response(final_content)
+                    else:
+                        console.print(Markdown(final_content))
+                    self.session.add_assistant_message(final_content)
+                break
+
+            if turn_count >= self.max_turns:
+                console.print(f"[bold yellow]Warning: Reached maximum agent loop limit ({self.max_turns} turns).[/bold yellow]")
+
+            return final_content
+
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            # Gracefully handle Ctrl+C or async cancellation:
+            # 1. Sanitize any dangling tool calls so context stays valid
+            self.session.sanitize_cancelled_state(cancellation_note="Interrupted by user (Ctrl+C)")
+            console.print("\n[yellow]⚠️  Agent execution interrupted by user (Ctrl+C). Session state preserved safely.[/yellow]\n")
+            return "[Interrupted by user]"

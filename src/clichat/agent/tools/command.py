@@ -51,6 +51,17 @@ class RunCommandTool(Tool):
                 except Exception:
                     pass
                 return f"Error: Command '{command}' timed out after {timeout} seconds."
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                try:
+                    proc.terminate()
+                    try:
+                        await asyncio.wait_for(proc.wait(), timeout=2.0)
+                    except (asyncio.TimeoutError, Exception):
+                        proc.kill()
+                        await proc.wait()
+                except Exception:
+                    pass
+                raise
 
             stdout_str = stdout_data.decode("utf-8", errors="replace").strip()
             stderr_str = stderr_data.decode("utf-8", errors="replace").strip()
