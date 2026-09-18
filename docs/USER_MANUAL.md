@@ -223,7 +223,7 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | :--- | :--- |
 | `/help` | 顯示所有指令清單與格式說明 |
 | `/mode <mode>` | 切換或檢視互動模式 (`chat` 或 `agent`) |
-| `/loop` | 切換或檢視 Agent Loop 策略 (`standard`, `plan`, `minimal`) |
+| `/loop <strategy> <turns>` | 切換或檢視 Agent Loop 策略與回合上限 (`standard`, `plan`, `minimal`) |
 | `/tools` | 表格化列出目前已註冊之內建工具與 MCP 外部工具 |
 | `/skills` | 列出所有可用技能（內建 commit, test, refactor，全域或專案專屬） |
 | `/skill <name>` | 動態載入特定技能工作指引至 Agent 系統提示詞中 |
@@ -236,7 +236,8 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `/model <name>` | 動態切換模型（支援 Tab 自動補全） |
 | `/provider <name>` | 動態切換提供者（支援 Tab 自動補全） |
 | `/system <prompt>` | 設定或檢視當前 System Prompt |
-| `/context` | 表格化顯示當前上下文視窗的 Token 佔比與利用率 |
+| `/context <limit>` | 表格化顯示或動態設定當前上下文視窗的 Token 佔比與利用率 |
+| `/compact <ratio>` | 手動壓縮對話上下文（摘要過往歷程、精簡工具輸出） |
 | `/usage` | 檢視 Token 累積消耗、模型訂閱狀態與 Rate Limit 限額資訊 |
 | `/multiline` | 切換單行 / 多行輸入模式（多行模式按 `Esc+Enter` 送出） |
 | `/save <filepath>` | 儲存會話（`.md` 存為 Markdown，`.json` 存為結構化會話） |

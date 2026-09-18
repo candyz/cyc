@@ -188,7 +188,7 @@ class TerminalUI:
         title = f"[bold green]cyc[/bold green] [dim]v{__version__}[/dim]"
         body = (
             f"Provider: [bold cyan]{provider}[/bold cyan]  |  Model: [bold cyan]{model}[/bold cyan]  |  {mode_label}  |  {ml_label}\n"
-            f"[dim]Commands: /help, /mode [chat|agent], /tools, /sessions, /resume, /models, /model <name>, /provider <name>, /exit[/dim]"
+            f"[dim]Commands: /help, /mode <chat|agent>, /tools, /sessions, /resume, /models, /model <name>, /provider <name>, /exit[/dim]"
         )
         self.console.print(Panel(body, title=title, border_style="cyan" if mode == "chat" else "magenta", box=ROUNDED))
 

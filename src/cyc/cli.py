@@ -282,7 +282,7 @@ class CliApp:
   /help                       Show this help message
   !<command>                  Execute a local shell command directly (e.g. !git status, !ls)
   /mode <mode>                Switch or inspect interaction mode (chat or agent)
-  /loop \[strat] \[turns]       Switch or inspect Agent loop strategy and max turns limit
+  /loop <strategy> <turns>    Switch or inspect Agent loop strategy and max turns limit
   /tools                      List registered agent tools (built-in & MCP)
   /skills                     List available skills (builtin, global, workspace)
   /skill <name>               Apply a specialized skill to agent instructions
@@ -295,8 +295,8 @@ class CliApp:
   /model <name>               Switch active model (tab-completion supported)
   /provider <name>            Switch active provider (tab-completion supported)
   /system <prompt>            Set or inspect system prompt
-  /context \[limit]            Inspect or update context window token limit
-  /compact \[ratio]            Manually compact conversation context (summarize & prune)
+  /context <limit>            Inspect or update context window token limit
+  /compact <ratio>            Manually compact conversation context (summarize & prune)
   /usage                      Show token usage, subscription tier & rate limits
   /multiline                  Toggle multi-line input mode
   /save <filepath>            Save current conversation to Markdown (.md) or JSON (.json)
