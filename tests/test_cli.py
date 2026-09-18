@@ -259,3 +259,19 @@ async def test_slash_command_undo():
     assert handled is True
     assert len(app.session.messages) == 0
 
+
+@pytest.mark.asyncio
+async def test_execute_shell_command(tmp_path):
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+    app.workspace_path = tmp_path
+
+    # Test empty command
+    await app.execute_shell_command("")
+
+    # Test valid command execution
+    test_file = tmp_path / "created_by_shell.txt"
+    await app.execute_shell_command(f"echo 'hello shell' > {test_file.name}")
+    assert test_file.exists()
+    assert "hello shell" in test_file.read_text(encoding="utf-8")
+

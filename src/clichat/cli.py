@@ -194,6 +194,35 @@ class CliApp:
         # Trigger background model cache refresh
         asyncio.create_task(self.update_cached_models())
 
+    async def execute_shell_command(self, cmd_line: str) -> None:
+        """Execute a local shell command directly via '!command' shortcut."""
+        cmd = cmd_line.strip()
+        if not cmd:
+            console.print("[dim yellow]Usage: !<command> (e.g. !ls -la, !git status, !pwd)[/dim yellow]")
+            return
+
+        console.print(f"[dim cyan]▸ Running:[/dim cyan] [bold]{cmd}[/bold]")
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                cmd,
+                cwd=str(self.workspace_path),
+            )
+            try:
+                await proc.wait()
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                try:
+                    proc.terminate()
+                    try:
+                        await asyncio.wait_for(proc.wait(), timeout=2.0)
+                    except (asyncio.TimeoutError, Exception):
+                        proc.kill()
+                        await proc.wait()
+                except Exception:
+                    pass
+                console.print("\n[dim yellow]Command interrupted by user.[/dim yellow]")
+        except Exception as e:
+            console.print(f"[bold red]Failed to execute command:[/bold red] {e}")
+
     async def run_single_prompt(self, user_prompt: str) -> None:
         if self.mode == "agent":
             try:
@@ -249,6 +278,7 @@ class CliApp:
         elif action == "/help":
             console.print(r"""[bold cyan]Available Commands:[/bold cyan]
   /help                       Show this help message
+  !<command>                  Execute a local shell command directly (e.g. !git status, !ls)
   /mode <mode>                Switch or inspect interaction mode (chat or agent)
   /loop [strat] [turns]       Switch or inspect Agent loop strategy and max turns limit
   /tools                      List registered agent tools (built-in & MCP)
@@ -807,6 +837,12 @@ class CliApp:
                 user_input = await asyncio.to_thread(prompt_session.prompt, prompt_label)
                 user_input = user_input.strip()
                 if not user_input:
+                    continue
+
+                if user_input.startswith("!"):
+                    # Shortcut for local shell execution
+                    shell_cmd = user_input[1:].strip()
+                    await self.execute_shell_command(shell_cmd)
                     continue
 
                 if user_input.startswith("/"):
