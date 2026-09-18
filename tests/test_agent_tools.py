@@ -121,3 +121,30 @@ def test_tool_registry():
     gemini_names = [t["name"] for t in gemini_tools]
     assert "replace_file_content" in gemini_names
     assert "run_script" in gemini_names
+
+def test_truncate_tool_output():
+    from clichat.agent.tools.base import truncate_tool_output
+
+    # 1. Normal small output remains untouched
+    small = "Normal output line 1\nLine 2\nLine 3"
+    assert truncate_tool_output(small) == small
+
+    # 2. Line-level truncation (1000 lines -> preserves head & tail)
+    many_lines = "\n".join(f"Line {i}: data payload content" for i in range(1000))
+    truncated_lines = truncate_tool_output(many_lines, max_lines=250, head_lines=150, tail_lines=60)
+    assert len(truncated_lines.splitlines()) < 300
+    assert "Line 0: data payload content" in truncated_lines
+    assert "Line 149: data payload content" in truncated_lines
+    assert "Line 999: data payload content" in truncated_lines
+    assert "Line 500: data payload content" not in truncated_lines
+    assert "... [Output truncated: omitted" in truncated_lines
+    assert "(150 head / 60 tail preserved)" in truncated_lines
+
+    # 3. Char-level truncation (huge single line string)
+    huge_text = "A" * 50_000
+    truncated_chars = truncate_tool_output(huge_text, max_chars=30_000, head_chars=20_000, tail_chars=8_000)
+    assert len(truncated_chars) <= 32_000
+    assert "... [Output truncated: omitted" in truncated_chars
+    assert "(20000 head / 8000 tail preserved)" in truncated_chars
+    assert truncated_chars.startswith("A" * 20_000)
+    assert truncated_chars.endswith("A" * 8_000)

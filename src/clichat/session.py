@@ -123,14 +123,16 @@ class SessionManager:
         self.auto_save()
 
     def add_tool_message(self, tool_call_id: str, name: str, content: str) -> None:
+        from clichat.agent.tools.base import truncate_tool_output
+        safe_content = truncate_tool_output(content)
         self.messages.append({
             "role": "tool",
             "tool_call_id": tool_call_id,
             "name": name,
-            "content": content,
+            "content": safe_content,
         })
         self.append_event("tool_message", {"name": name, "tool_call_id": tool_call_id})
-        self.total_completion_tokens += estimate_tokens(content)
+        self.total_completion_tokens += estimate_tokens(safe_content)
         self.updated_at = time.time()
         self._prune_context_if_needed()
         self.auto_save()

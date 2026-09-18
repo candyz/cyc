@@ -97,3 +97,43 @@ async def test_agent_loop_tool_execution(tmp_path):
     roles = [m["role"] for m in session.messages]
     assert roles == ["user", "assistant", "tool", "assistant"]
     assert "file content hello world" in session.messages[2]["content"]
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_truncates_oversized_tool_output(tmp_path):
+    # Create an oversized file with 500 lines
+    huge_file = tmp_path / "huge.txt"
+    huge_file.write_text("\n".join(f"ROW_{i}" for i in range(500)), encoding="utf-8")
+
+    provider = MockAgentProvider([
+        AgentTurnResponse(
+            content="Reading huge file",
+            tool_calls=[
+                ToolCallRequest(
+                    id="call_huge",
+                    name="read_file",
+                    arguments={"path": str(huge_file), "end_line": 500},
+                )
+            ],
+        ),
+        AgentTurnResponse(
+            content="Finished inspecting.",
+            tool_calls=[],
+        ),
+    ])
+
+    registry = ToolRegistry([ReadFileTool()])
+    session = SessionManager()
+    loop = AgentLoop(
+        provider=provider,
+        model="mock-model",
+        session=session,
+        tool_registry=registry,
+        permission_manager=PermissionManager(PermissionMode.AUTO),
+    )
+
+    await loop.run_turn("Inspect huge file")
+    # Tool output in session should be truncated
+    tool_msg = session.messages[2]
+    assert tool_msg["role"] == "tool"
+    assert "... [Output truncated:" in tool_msg["content"] or "[Note: Output truncated" in tool_msg["content"]

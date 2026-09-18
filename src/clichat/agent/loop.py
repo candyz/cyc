@@ -5,7 +5,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from clichat.agent.permissions import PermissionManager
-from clichat.agent.tools import ToolRegistry
+from clichat.agent.tools import ToolRegistry, truncate_tool_output
 from clichat.providers.base import AgentTurnResponse, BaseProvider
 from clichat.providers.gemini import GeminiProvider
 from clichat.session import SessionManager
@@ -125,6 +125,7 @@ class AgentLoop:
                         if permitted:
                             with console.status(f"[dim cyan]Executing tool: {tc.name}...[/dim cyan]", spinner="dots"):
                                 observation = await tool.execute(**tc.arguments)
+                            observation = truncate_tool_output(observation)
                             self._render_tool_result_preview(tc.name, observation)
                         else:
                             observation = "Error: Execution of this tool was denied by the user."
