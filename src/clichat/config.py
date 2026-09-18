@@ -197,6 +197,7 @@ providers:
 agent:
   max_turns: 100
   compact_threshold: 0.80
+  searxng_url: "http://localhost:8080"
 
 # Terminal UI configuration
 ui:
