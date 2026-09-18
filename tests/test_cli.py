@@ -104,6 +104,10 @@ async def test_handle_slash_command_mode_and_tools():
     handled = await app.handle_slash_command("/tools")
     assert handled is True
 
+    handled = await app.handle_slash_command("/help")
+    assert handled is True
+
+
 
 def test_status_toolbar():
     config = load_config(Path("/nonexistent"))
