@@ -84,6 +84,11 @@ def test_parse_args_agent_flags():
         assert args.yes is True
         assert args.read_only is True
 
+    with patch.object(sys, "argv", ["cyc", "--chat"]):
+        args = parse_args()
+        assert args.chat is True
+
+
 
 @pytest.mark.asyncio
 async def test_handle_slash_command_mode_and_tools():
@@ -278,4 +283,29 @@ async def test_execute_shell_command(tmp_path):
     await app.execute_shell_command(f"echo 'hello shell' > {test_file.name}")
     assert test_file.exists()
     assert "hello shell" in test_file.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_async_main_config_defaults(tmp_path):
+    custom_config = tmp_path / "custom_config.yaml"
+    custom_config.write_text("""
+agent:
+  default_mode: "agent"
+  auto_approve: true
+  default_trust: true
+""", encoding="utf-8")
+
+    with patch.object(sys, "argv", ["cyc", "-c", str(custom_config), "test query"]):
+        with patch.object(sys.stdin, "isatty", return_value=True):
+            with patch("cyc.cli.CliApp") as mock_cliapp_cls:
+                mock_app_instance = AsyncMock()
+                mock_cliapp_cls.return_value = mock_app_instance
+                await async_main()
+                assert mock_cliapp_cls.called
+                _, kwargs = mock_cliapp_cls.call_args
+                assert kwargs["mode"] == "agent"
+                from cyc.agent import PermissionMode
+                assert kwargs["permission_mode"] == PermissionMode.AUTO
+
+
 

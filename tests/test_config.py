@@ -33,6 +33,24 @@ def test_load_default_config():
     assert "opencode" in config.providers
     assert config.get_provider("ollama").base_url == "http://localhost:11434/v1"
     assert config.get_provider("omlx").base_url == "http://localhost:8000/v1"
+    assert config.agent.default_mode == "chat"
+    assert config.agent.auto_approve is False
+    assert config.agent.default_trust is None
+
+def test_load_custom_agent_config(tmp_path: Path):
+    custom_yaml = tmp_path / "custom_config.yaml"
+    custom_yaml.write_text("""
+agent:
+  default_mode: "agent"
+  auto_approve: true
+  default_trust: true
+""", encoding="utf-8")
+    config = load_config(custom_yaml)
+    assert config.agent.default_mode == "agent"
+    assert config.agent.auto_approve is True
+    assert config.agent.default_trust is True
+    assert config.default_provider == "ollama"
+
 
 def test_init_config_file(tmp_path: Path):
     target = tmp_path / "subdir" / "config.yaml"

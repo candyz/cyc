@@ -892,8 +892,9 @@ def parse_args():
     parser.add_argument("-c", "--config", help="Custom config path")
     parser.add_argument("--init", action="store_true", help="Generate default configuration file")
     parser.add_argument("-f", "--force", action="store_true", help="Force overwrite existing config during init")
-    parser.add_argument("--agent", action="store_true", help="Enable autonomous Coding Agent mode")
-    parser.add_argument("-y", "--yes", action="store_true", help="Auto-approve all tool actions without interactive prompt")
+    parser.add_argument("--agent", action="store_true", default=None, help="Enable autonomous Coding Agent mode")
+    parser.add_argument("--chat", action="store_true", default=None, help="Force interactive Chat mode")
+    parser.add_argument("-y", "--yes", action="store_true", default=None, help="Auto-approve all tool actions without interactive prompt")
     parser.add_argument("--read-only", action="store_true", help="Block all mutation tools (write_file, replace, run_command)")
     parser.add_argument("-r", "--resume", nargs="?", const="LATEST", help="Resume a previous session by ID/prefix (or latest if omitted)")
     parser.add_argument("--max-turns", type=int, default=None, help="Maximum number of turns for Agent loop (default: 100)")
@@ -1028,17 +1029,26 @@ async def async_main():
             if not resumed_session:
                 console.print(f"[bold red]Session not found in cyc, agy, claude, pi, or opencode:[/bold red] {args.resume}. Starting new session.")
 
-    # Determine mode and permissions
-    if resumed_session and resumed_session.mode and not args.agent:
+    # Determine mode:
+    # 1. Command-line flags take highest priority (--agent or --chat)
+    # 2. Resumed session mode if available
+    # 3. config.agent.default_mode (defaults to "chat")
+    configured_default_mode = getattr(getattr(config, "agent", None), "default_mode", "chat")
+    if args.agent:
+        mode = "agent"
+    elif args.chat:
+        mode = "chat"
+    elif resumed_session and resumed_session.mode:
         mode = resumed_session.mode
     else:
-        mode = "agent" if args.agent else "chat"
+        mode = "agent" if str(configured_default_mode).lower() == "agent" else "chat"
 
     # Workspace trust evaluation (especially relevant for agent mode or when flags passed)
     trust_mgr = WorkspaceTrustManager()
-    auto_trust_flag = True if args.trust else (False if args.no_trust else None)
+    configured_default_trust = getattr(getattr(config, "agent", None), "default_trust", None)
+    auto_trust_flag = True if args.trust else (False if args.no_trust else configured_default_trust)
 
-    # In agent mode without explicit flags, prompt if workspace not yet trusted/restricted
+    # In agent mode without explicit flags or configured default, prompt if workspace not yet trusted/restricted
     if mode == "agent" and auto_trust_flag is None and trust_mgr.get_trust_status(Path.cwd()) is None:
         if sys.stdin.isatty():
             is_trusted = await trust_mgr.ensure_workspace_trust(Path.cwd())
@@ -1052,9 +1062,12 @@ async def async_main():
     else:
         is_trusted = trust_mgr.get_trust_status(Path.cwd())
 
+    configured_auto_approve = getattr(getattr(config, "agent", None), "auto_approve", False)
+    effective_yes = True if args.yes else (False if getattr(args, "no_yes", False) else configured_auto_approve)
+
     if args.read_only or is_trusted is False:
         permission_mode = PermissionMode.READ_ONLY
-    elif args.yes:
+    elif effective_yes:
         permission_mode = PermissionMode.AUTO
     else:
         permission_mode = PermissionMode.INTERACTIVE

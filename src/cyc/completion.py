@@ -8,7 +8,7 @@ _cyc_completion() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent -y --yes --read-only -r --resume --sessions --trust --no-trust --completion init"
+    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent --chat -y --yes --read-only -r --resume --sessions --trust --no-trust --completion init"
     providers="ollama openrouter omlx nvidia gemini agy opencode"
 
     case "${prev}" in
@@ -61,6 +61,7 @@ _cyc() {
         '--init[Generate default configuration file]'
         '(-f --force)'{-f,--force}'[Force overwrite existing config during init]'
         '--agent[Enable autonomous Coding Agent mode]'
+        '--chat[Force interactive Chat mode]'
         '(-y --yes)'{-y,--yes}'[Auto-approve all tool actions without interactive prompt]'
         '--read-only[Block all mutation tools (write_file, replace, run_command)]'
         '(-r --resume)'{-r,--resume}'[Resume a previous session by ID/prefix (or latest)]'

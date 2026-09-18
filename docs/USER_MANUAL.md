@@ -74,8 +74,19 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 
   # 唯讀沙箱模式 (禁止任何檔案修改或指令執行)
   cyc --agent --read-only
+
+  # 若設定檔已預設為 agent，欲臨時以交談模式啟動：
+  cyc --chat
   ```
-- 或在 REPL 中輸入 `/mode agent` 隨時切換。
+- **全域預設配置 (`~/.config/cyc/config.yaml`)**：
+  若您希望每次執行 `cyc` 都預設啟用 Agent 模式且免確認，可於設定檔直接配置：
+  ```yaml
+  agent:
+    default_mode: "agent"  # 開機預設為 agent (命令列可使用 --chat 臨時覆蓋)
+    auto_approve: true     # 開機預設等同 -y/--yes，跳過每次工具確認
+    default_trust: true    # 預設信任目前工作區 (略過 [y/n/q] 提示)
+  ```
+- 或在 REPL 中輸入 `/mode agent` / `/mode chat` 隨時切換。
 
 ---
 

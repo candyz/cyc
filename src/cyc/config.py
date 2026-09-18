@@ -42,6 +42,9 @@ class AgentConfig(BaseModel):
     max_turns: int = 100
     compact_threshold: float = 0.80
     searxng_url: str = "https://searx.be"
+    default_mode: str = "chat"  # "chat" or "agent"
+    auto_approve: bool = False  # If True, equivalent to --yes
+    default_trust: Optional[bool] = None  # True (trust), False (no-trust), or None (interactive prompt)
 
 class Config(BaseModel):
     default_provider: str = "ollama"
@@ -126,6 +129,11 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         merged_providers = dict(DEFAULT_CONFIG_DICT["providers"])
         merged_providers.update(user_data.get("providers", {}))
         raw_data["providers"] = merged_providers
+
+        # Merge agent section defaults
+        merged_agent = dict(DEFAULT_CONFIG_DICT.get("agent", {}))
+        merged_agent.update(user_data.get("agent", {}))
+        raw_data["agent"] = merged_agent
     else:
         raw_data = DEFAULT_CONFIG_DICT
 
@@ -195,6 +203,9 @@ providers:
 
 # Agent configuration
 agent:
+  default_mode: "chat"            # "chat" or "agent" (set to "agent" to default to --agent)
+  auto_approve: false             # true to auto-approve mutation tools (equivalent to --yes)
+  default_trust: null             # true (trust), false (no-trust/read-only), or null (prompt when entering workspace)
   max_turns: 100
   compact_threshold: 0.80
   searxng_url: "http://localhost:8080"

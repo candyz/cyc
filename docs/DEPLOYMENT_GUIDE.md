@@ -117,6 +117,9 @@ providers:
 
 # Agent 核心設定
 agent:
+  default_mode: "agent"           # 預設啟動模式 ("chat" 或 "agent"，設為 "agent" 則開機即為代理模式)
+  auto_approve: true              # 預設自動核准工具執行 (等同 --yes，跳過每次 [y/N] 確認)
+  default_trust: true             # 預設目錄信任狀態 (true: 信任, false: 強制唯讀, null: 首次訪問時互動提示)
   max_turns: 100                  # Agent 單次任務最大決策回合上限
   compact_threshold: 0.80         # 當上下文達到 80% 時自動啟動 Compact 壓縮
   searxng_url: "http://192.168.10.4:8080" # SearXNG 搜尋實例位址 (亦可透過環境變數 SEARXNG_URL 指定)
