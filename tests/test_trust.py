@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from clichat.agent.trust import WorkspaceTrustManager
+from cyc.agent.trust import WorkspaceTrustManager
 
 
 def test_workspace_trust_manager_flow(tmp_path: Path):

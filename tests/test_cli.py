@@ -2,12 +2,12 @@ import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 import pytest
-from clichat.cli import parse_args, async_main, CliApp
-from clichat.config import load_config
-from clichat.session import SessionManager
+from cyc.cli import parse_args, async_main, CliApp
+from cyc.config import load_config
+from cyc.session import SessionManager
 
 def test_parse_args_defaults():
-    with patch.object(sys, "argv", ["clichat"]):
+    with patch.object(sys, "argv", ["cyc"]):
         args = parse_args()
         assert args.prompt == []
         assert args.provider is None
@@ -15,7 +15,7 @@ def test_parse_args_defaults():
         assert not args.init
 
 def test_parse_args_with_options():
-    with patch.object(sys, "argv", ["clichat", "-p", "openrouter", "-m", "claude", "--max-turns", "50", "What is AI?"]):
+    with patch.object(sys, "argv", ["cyc", "-p", "openrouter", "-m", "claude", "--max-turns", "50", "What is AI?"]):
         args = parse_args()
         assert args.provider == "openrouter"
         assert args.model == "claude"
@@ -23,7 +23,7 @@ def test_parse_args_with_options():
         assert args.prompt == ["What is AI?"]
 
 def test_parse_args_init():
-    with patch.object(sys, "argv", ["clichat", "init", "-f"]):
+    with patch.object(sys, "argv", ["cyc", "init", "-f"]):
         args = parse_args()
         assert args.prompt == ["init"]
         assert args.force is True
@@ -31,7 +31,7 @@ def test_parse_args_init():
 @pytest.mark.asyncio
 async def test_async_main_init_command(tmp_path: Path):
     target_config = tmp_path / "custom_config.yaml"
-    with patch.object(sys, "argv", ["clichat", "init", "-c", str(target_config)]):
+    with patch.object(sys, "argv", ["cyc", "init", "-c", str(target_config)]):
         await async_main()
         assert target_config.exists()
         content = target_config.read_text(encoding="utf-8")
@@ -78,7 +78,7 @@ async def test_non_openrouter_keeps_all_models():
 
 
 def test_parse_args_agent_flags():
-    with patch.object(sys, "argv", ["clichat", "--agent", "-y", "--read-only"]):
+    with patch.object(sys, "argv", ["cyc", "--agent", "-y", "--read-only"]):
         args = parse_args()
         assert args.agent is True
         assert args.yes is True
@@ -139,7 +139,7 @@ async def test_sessions_and_resume_slash_commands(tmp_path: Path):
 
     app = CliApp(config, provider_name="ollama")
 
-    with patch("clichat.session.DEFAULT_SESSIONS_DIR", sessions_dir):
+    with patch("cyc.session.DEFAULT_SESSIONS_DIR", sessions_dir):
         # /sessions
         handled_sessions = await app.handle_slash_command("/sessions")
         assert handled_sessions is True
@@ -153,15 +153,15 @@ async def test_sessions_and_resume_slash_commands(tmp_path: Path):
 
 
 def test_parse_args_resume_and_sessions():
-    with patch.object(sys, "argv", ["clichat", "-r"]):
+    with patch.object(sys, "argv", ["cyc", "-r"]):
         args = parse_args()
         assert args.resume == "LATEST"
 
-    with patch.object(sys, "argv", ["clichat", "--resume", "my_session_123"]):
+    with patch.object(sys, "argv", ["cyc", "--resume", "my_session_123"]):
         args = parse_args()
         assert args.resume == "my_session_123"
 
-    with patch.object(sys, "argv", ["clichat", "--sessions"]):
+    with patch.object(sys, "argv", ["cyc", "--sessions"]):
         args = parse_args()
         assert args.sessions is True
 
@@ -185,31 +185,31 @@ async def test_slash_command_trust(tmp_path: Path):
 
 
 def test_parse_args_trust_flags():
-    with patch.object(sys, "argv", ["clichat", "--trust"]):
+    with patch.object(sys, "argv", ["cyc", "--trust"]):
         args = parse_args()
         assert args.trust is True
 
-    with patch.object(sys, "argv", ["clichat", "--no-trust"]):
+    with patch.object(sys, "argv", ["cyc", "--no-trust"]):
         args = parse_args()
         assert args.no_trust is True
 
 
 def test_parse_args_completion():
-    with patch.object(sys, "argv", ["clichat", "--completion"]):
+    with patch.object(sys, "argv", ["cyc", "--completion"]):
         args = parse_args()
         assert args.completion == "bash"
 
-    with patch.object(sys, "argv", ["clichat", "--completion", "zsh"]):
+    with patch.object(sys, "argv", ["cyc", "--completion", "zsh"]):
         args = parse_args()
         assert args.completion == "zsh"
 
 
 @pytest.mark.asyncio
 async def test_async_main_completion(capsys):
-    with patch.object(sys, "argv", ["clichat", "--completion", "bash"]):
+    with patch.object(sys, "argv", ["cyc", "--completion", "bash"]):
         await async_main()
         captured = capsys.readouterr()
-        assert "complete -F _clichat_completion clichat" in captured.out
+        assert "complete -F _cyc_completion cyc" in captured.out
 
 
 @pytest.mark.asyncio
@@ -218,7 +218,7 @@ async def test_slash_command_sessions_and_resume():
     app = CliApp(config, provider_name="ollama")
 
     # /sessions with different source filters
-    for src in ("all", "clichat", "agy", "claude", "pi", "opencode"):
+    for src in ("all", "cyc", "agy", "claude", "pi", "opencode"):
         handled = await app.handle_slash_command(f"/sessions {src}")
         assert handled is True
 

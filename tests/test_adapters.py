@@ -3,7 +3,7 @@ from pathlib import Path
 import sqlite3
 import pytest
 
-from clichat.adapters import SessionAdapters
+from cyc.adapters import SessionAdapters
 
 
 def test_import_agy_session(tmp_path: Path):
@@ -268,16 +268,16 @@ def test_export_and_sync_back_to_agy(tmp_path: Path):
         for r in initial_records:
             f.write(json.dumps(r) + "\n")
 
-    # 1. Import session into clichat
+    # 1. Import session into cyc
     imported = SessionAdapters.import_agy_session("test-sync-agy", brain_dir=brain_dir)
     assert imported is not None
     assert imported.external_metadata["source_agent"] == "agy"
     assert imported.external_metadata["source_id"] == conv_id
     assert imported.external_metadata["base_message_count"] == 2
 
-    # 2. Add new user and assistant turns in clichat
-    imported.add_user_message("New question asked in clichat")
-    imported.add_assistant_message("New solution answered in clichat")
+    # 2. Add new user and assistant turns in cyc
+    imported.add_user_message("New question asked in cyc")
+    imported.add_assistant_message("New solution answered in cyc")
 
     # 3. Sync session back to AGY
     result = SessionAdapters.sync_session_back(imported)
@@ -291,10 +291,10 @@ def test_export_and_sync_back_to_agy(tmp_path: Path):
     # Check step indexes continuous
     assert lines[2]["step_index"] == 2
     assert lines[2]["type"] == "USER_INPUT"
-    assert "New question asked in clichat" in lines[2]["content"]
+    assert "New question asked in cyc" in lines[2]["content"]
     assert lines[3]["step_index"] == 3
     assert lines[3]["type"] == "PLANNER_RESPONSE"
-    assert lines[3]["content"] == "New solution answered in clichat"
+    assert lines[3]["content"] == "New solution answered in cyc"
 
     # 5. Calling sync again without new messages should report already up to date
     res2 = SessionAdapters.sync_session_back(imported)
@@ -323,7 +323,7 @@ def test_export_and_sync_back_to_claude(tmp_path: Path):
     assert imported.external_metadata["source_id"] == "claude-session-xyz"
     assert imported.external_metadata["base_message_count"] == 2
 
-    # 2. Add new user and assistant message with tool call in clichat
+    # 2. Add new user and assistant message with tool call in cyc
     imported.add_user_message("Please run tests")
     imported.messages.append({
         "role": "assistant",
@@ -386,7 +386,7 @@ def test_export_and_sync_back_to_pi(tmp_path: Path):
     assert imported.external_metadata["source_id"] == "pi-session-abc"
     assert imported.external_metadata["base_message_count"] == 2
 
-    # 2. Add new user & assistant message in clichat
+    # 2. Add new user & assistant message in cyc
     imported.add_user_message("Check system status")
     imported.messages.append({
         "role": "assistant",

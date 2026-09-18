@@ -1,12 +1,12 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
-from clichat.config import ProviderConfig
-from clichat.providers import create_provider
-from clichat.providers.openai import OpenAICompatibleProvider
-from clichat.providers.gemini import GeminiProvider
-from clichat.providers.agy import AntigravityProvider, DEFAULT_AGY_MODELS
-from clichat.providers.opencode import OpenCodeProvider, DEFAULT_OPENCODE_ZEN_MODELS
+from cyc.config import ProviderConfig
+from cyc.providers import create_provider
+from cyc.providers.openai import OpenAICompatibleProvider
+from cyc.providers.gemini import GeminiProvider
+from cyc.providers.agy import AntigravityProvider, DEFAULT_AGY_MODELS
+from cyc.providers.opencode import OpenCodeProvider, DEFAULT_OPENCODE_ZEN_MODELS
 
 def test_create_openai_provider():
     cfg = ProviderConfig(
@@ -218,7 +218,7 @@ async def test_opencode_list_models_mock():
 
 @pytest.mark.asyncio
 async def test_retry_async_success_after_transient_error():
-    from clichat.providers.base import is_retryable_error, retry_async
+    from cyc.providers.base import is_retryable_error, retry_async
 
     # 1. Test error classification
     class FakeRateLimitError(Exception):

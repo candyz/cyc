@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from clichat.agent.tools import (
+from cyc.agent.tools import (
     ToolRegistry,
     get_default_tools,
     ReadFileTool,
@@ -191,7 +191,7 @@ async def test_web_search_tool():
         assert "Comprehensive asyncio guide." in res
 
 def test_truncate_tool_output():
-    from clichat.agent.tools.base import truncate_tool_output
+    from cyc.agent.tools.base import truncate_tool_output
 
     # 1. Normal small output remains untouched
     small = "Normal output line 1\nLine 2\nLine 3"
@@ -218,7 +218,7 @@ def test_truncate_tool_output():
     assert truncated_chars.endswith("A" * 8_000)
 
 def test_enrich_tool_error_observation():
-    from clichat.agent.tools.base import enrich_tool_error_observation
+    from cyc.agent.tools.base import enrich_tool_error_observation
 
     # 1. Success observation is not modified
     success = "Successfully wrote 120 bytes to file.txt"

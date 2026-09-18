@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 from typing import Optional
-from clichat.agent.tools.base import Tool
+from cyc.agent.tools.base import Tool
 
 MAX_OUTPUT_CHARS = 25000
 MAX_OUTPUT_LINES = 250

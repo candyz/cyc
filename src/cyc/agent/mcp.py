@@ -1,4 +1,4 @@
-"""MCP (Model Context Protocol) Client and Dynamic Tool Adapter for clichat.
+"""MCP (Model Context Protocol) Client and Dynamic Tool Adapter for cyc.
 Supports stdio-based MCP servers using standard JSON-RPC 2.0 protocol.
 """
 
@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
-from clichat.agent.tools.base import Tool
+from cyc.agent.tools.base import Tool
 
 console = Console()
 
@@ -74,7 +74,7 @@ class StdioMCPClient:
                         "sampling": {},
                     },
                     "clientInfo": {
-                        "name": "clichat",
+                        "name": "cyc",
                         "version": "0.2.11",
                     },
                 },
@@ -179,7 +179,7 @@ class StdioMCPClient:
 
 
 class MCPDynamicTool(Tool):
-    """Bridge adapter that wraps an MCP server tool as a native clichat Tool."""
+    """Bridge adapter that wraps an MCP server tool as a native cyc Tool."""
 
     def __init__(
         self,

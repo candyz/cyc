@@ -1,14 +1,14 @@
 from typing import Dict, List, Optional
-from clichat.agent.tools.base import Tool, truncate_tool_output, enrich_tool_error_observation
-from clichat.agent.tools.filesystem import (
+from cyc.agent.tools.base import Tool, truncate_tool_output, enrich_tool_error_observation
+from cyc.agent.tools.filesystem import (
     ReadFileTool,
     WriteFileTool,
     ReplaceFileContentTool,
     ListDirTool,
 )
-from clichat.agent.tools.command import RunCommandTool, RunScriptTool
-from clichat.agent.tools.search import GrepSearchTool
-from clichat.agent.tools.web import WebSearchTool, FetchUrlTool
+from cyc.agent.tools.command import RunCommandTool, RunScriptTool
+from cyc.agent.tools.search import GrepSearchTool
+from cyc.agent.tools.web import WebSearchTool, FetchUrlTool
 
 def get_default_tools(searxng_url: Optional[str] = None) -> List[Tool]:
     """Return an instantiated list of all 9 core built-in tools."""

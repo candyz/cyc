@@ -27,7 +27,7 @@ def build_coding_agent_system_prompt(custom_instructions: Optional[str] = None) 
     system_os = platform.system()
     git_info = get_git_info()
 
-    base_prompt = f"""You are clichat Coding Agent, an expert AI software engineer pair programming with the user.
+    base_prompt = f"""You are cyc Coding Agent, an expert AI software engineer pair programming with the user.
 
 Workspace Environment:
 - Current Working Directory: {cwd}
@@ -42,9 +42,9 @@ Core Operating Principles:
 5. Transparency: Explain your rationale clearly and concisely before calling tools.
 """
 
-    # Check for repository instruction files (CLICHAT.md, AGENTS.md, GEMINI.md, CLAUDE.md, etc.)
+    # Check for repository instruction files (CYC.md, AGENTS.md, GEMINI.md, CLAUDE.md, etc.)
     rule_candidates = (
-        "CLICHAT.md",
+        "CYC.md",
         "AGENTS.md",
         ".gemini/GEMINI.md",
         ".gemini/AGENTS.md",

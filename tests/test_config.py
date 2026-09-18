@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import pytest
-from clichat.config import expand_env_vars, init_config_file, load_config
+from cyc.config import expand_env_vars, init_config_file, load_config
 
 def test_expand_env_vars(monkeypatch):
     monkeypatch.setenv("TEST_KEY", "secret_123")

@@ -11,7 +11,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from clichat.session import SessionManager
+from cyc.session import SessionManager
 
 AGY_BRAIN_DIR = Path.home() / ".gemini" / "antigravity-cli" / "brain"
 CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"

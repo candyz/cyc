@@ -3,13 +3,13 @@ import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
-from clichat.agent.tools.command import RunScriptTool
-from clichat.agent.loop import AgentLoop
-from clichat.agent.skills import SkillManager
-from clichat.session import SessionManager
-from clichat.cli import CliApp
-from clichat.config import Config, ProviderConfig, load_config
-from clichat.agent.permissions import PermissionManager, PermissionMode
+from cyc.agent.tools.command import RunScriptTool
+from cyc.agent.loop import AgentLoop
+from cyc.agent.skills import SkillManager
+from cyc.session import SessionManager
+from cyc.cli import CliApp
+from cyc.config import Config, ProviderConfig, load_config
+from cyc.agent.permissions import PermissionManager, PermissionMode
 
 
 @pytest.mark.asyncio
@@ -37,7 +37,7 @@ echo "Bash PTC execution"
     assert "Bash PTC execution" in result
 
 
-from clichat.providers.base import AgentTurnResponse
+from cyc.providers.base import AgentTurnResponse
 
 @pytest.mark.asyncio
 async def test_agent_loop_strategies(tmp_path):
@@ -96,7 +96,7 @@ def test_skill_manager_discovery_and_lookup(tmp_path):
     assert "refactor" in skill_names
 
     # Add a custom workspace skill
-    local_skills_dir = tmp_path / ".clichat" / "skills"
+    local_skills_dir = tmp_path / ".cyc" / "skills"
     local_skills_dir.mkdir(parents=True)
     custom_skill_file = local_skills_dir / "deploy.md"
     custom_skill_file.write_text("# Production Deployment Skill\nRun deployment scripts carefully.")
@@ -219,9 +219,9 @@ async def test_slash_commands_dsh(tmp_path):
 
 @pytest.mark.asyncio
 async def test_provider_usage_info():
-    from clichat.providers.gemini import GeminiProvider
-    from clichat.providers.agy import AntigravityProvider
-    from clichat.providers.opencode import OpenCodeProvider
+    from cyc.providers.gemini import GeminiProvider
+    from cyc.providers.agy import AntigravityProvider
+    from cyc.providers.opencode import OpenCodeProvider
 
     gemini_prov = GeminiProvider(api_key="mock-key")
     gemini_info = await gemini_prov.get_usage_info("gemini-2.5-flash")

@@ -112,7 +112,7 @@ DEFAULT_CONFIG_DICT = {
     }
 }
 
-DEFAULT_CONFIG_PATH = Path.home() / ".config" / "clichat" / "config.yaml"
+DEFAULT_CONFIG_PATH = Path.home() / ".config" / "cyc" / "config.yaml"
 
 def load_config(config_path: Optional[Path] = None) -> Config:
     path = config_path or DEFAULT_CONFIG_PATH
@@ -132,7 +132,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
     expanded_data = expand_env_vars(raw_data)
     return Config.model_validate(expanded_data)
 
-DEFAULT_CONFIG_TEMPLATE = """# clichat configuration file
+DEFAULT_CONFIG_TEMPLATE = """# cyc configuration file
 # Default provider and model to use on startup
 default_provider: ollama
 default_model: llama3.3:latest

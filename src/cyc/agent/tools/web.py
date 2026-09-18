@@ -4,7 +4,7 @@ import re
 import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
-from clichat.agent.tools.base import Tool, truncate_tool_output
+from cyc.agent.tools.base import Tool, truncate_tool_output
 
 def _html_to_clean_text(html_str: str) -> str:
     """Convert HTML string to clean, readable plain text / markdown-like format."""
@@ -78,7 +78,7 @@ class WebSearchTool(Tool):
         req = urllib.request.Request(
             req_url,
             headers={
-                "User-Agent": "clichat/1.0 (Web Search Tool)",
+                "User-Agent": "cyc/1.0 (Web Search Tool)",
                 "Accept": "application/json",
             },
         )

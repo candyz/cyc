@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Callable, Dict, Optional, Set
 from rich.console import Console
 from rich.panel import Panel
-from clichat.agent.tools.base import Tool
-from clichat.agent.diff import render_diff_panel
+from cyc.agent.tools.base import Tool
+from cyc.agent.diff import render_diff_panel
 
 console = Console()
 

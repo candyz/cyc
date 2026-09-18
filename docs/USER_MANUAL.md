@@ -1,6 +1,6 @@
-# clichat 使用手冊 (User Manual)
+# cyc 使用手冊 (User Manual)
 
-`clichat` 是一款現代化、高效且具備自主編程代理能力的終端 CLI 對話與程式碼輔助工具。它無縫整合本地開源大模型與主流雲端 API，並相容多種常見 AI 代理工具之會話資料。
+`cyc` 是一款現代化、高效且具備自主編程代理能力的終端 CLI 對話與程式碼輔助工具。它無縫整合本地開源大模型與主流雲端 API，並相容多種常見 AI 代理工具之會話資料。
 
 ---
 
@@ -10,11 +10,11 @@
 
 首次使用建議先產生預設設定檔：
 ```bash
-# 產生預設設定檔 (~/.config/clichat/config.yaml)
-clichat init
+# 產生預設設定檔 (~/.config/cyc/config.yaml)
+cyc init
 
 # 啟動互動式終端介面 (預設為對話模式，連線本地 Ollama)
-clichat
+cyc
 ```
 
 ### 1.2 指定提供者 (Provider) 與模型 (Model)
@@ -23,19 +23,19 @@ clichat
 
 ```bash
 # 1. 使用本地 Google Antigravity (直連 Gemini Pro 訂閱配額)
-clichat -p agy -m "gemini-3.1-pro-high"
+cyc -p agy -m "gemini-3.1-pro-high"
 
 # 2. 使用本地 OpenCode (直連 Zen Free 免費社群模型)
-clichat -p opencode -m "opencode/nemotron-3.5-lightning-free"
+cyc -p opencode -m "opencode/nemotron-3.5-lightning-free"
 
 # 3. 使用 Google Gemini 官方 API (支援免費層與付費層)
-clichat -p gemini -m "gemini-2.5-flash"
+cyc -p gemini -m "gemini-2.5-flash"
 
 # 4. 使用本地 Apple Silicon MLX (OMLX)
-clichat -p omlx -m "default"
+cyc -p omlx -m "default"
 
 # 5. 使用 OpenRouter
-clichat -p openrouter -m "anthropic/claude-3.5-sonnet"
+cyc -p openrouter -m "anthropic/claude-3.5-sonnet"
 ```
 
 ### 1.3 單次查詢與 Unix Pipeline (管線模式)
@@ -44,18 +44,18 @@ clichat -p openrouter -m "anthropic/claude-3.5-sonnet"
 
 ```bash
 # 直接問答
-clichat "請解釋 Python asyncio 的事件迴圈機制"
+cyc "請解釋 Python asyncio 的事件迴圈機制"
 
 # 管道輸出與分析
-cat app.log | clichat "請分析這些錯誤日誌並列出可能的根因"
-git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
+cat app.log | cyc "請分析這些錯誤日誌並列出可能的根因"
+git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 ```
 
 ---
 
 ## 2. 兩種運作模式 (Mode)
 
-`clichat` 支援兩種核心執行模式：
+`cyc` 支援兩種核心執行模式：
 
 ### 2.1 💬 聊天模式 (Chat Mode - 預設)
 - 專注於即時串流問答、概念諮詢與文字編輯。
@@ -67,13 +67,13 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 - 啟動方式：
   ```bash
   # 啟動時直接進入 Agent 模式
-  clichat --agent
+  cyc --agent
 
   # 免確認模式 (自動執行所有工具呼叫)
-  clichat --agent -y
+  cyc --agent -y
 
   # 唯讀沙箱模式 (禁止任何檔案修改或指令執行)
-  clichat --agent --read-only
+  cyc --agent --read-only
   ```
 - 或在 REPL 中輸入 `/mode agent` 隨時切換。
 
@@ -102,7 +102,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 傳統 Agent 需經過多次 round-trip 才能完成「讀取多個檔案 ➔ 數據過濾 ➔ 寫入新檔案」。`run_script` 工具讓模型能夠在單次回合內產出完整 Python/Bash 運算管線，顯著節省 API 延遲與 Token 開銷。
 
 ### 4.2 可插拔 Loop 執行策略與上限調整 (`/loop`)
-- `clichat` 預設 Agent 思考與工具執行上限為 **100 回合**（可於 `config.yaml` 的 `agent.max_turns` 設定，或透過啟動參數 `--max-turns <int>` 覆蓋）。
+- `cyc` 預設 Agent 思考與工具執行上限為 **100 回合**（可於 `config.yaml` 的 `agent.max_turns` 設定，或透過啟動參數 `--max-turns <int>` 覆蓋）。
 - `/loop` 指令支援動態切換決策策略與調整單一會話回合上限：
   - `standard`（預設）：標準多回合 ReAct 循環，平衡效率與工具調度。
   - `plan`：**先規劃後執行**（Plan-and-Solve），適合大型架構重構或跨模組開發。
@@ -127,7 +127,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 
 
 ### 4.4 跨代理標準技能庫 (Standard Agent Skills)
-`clichat` 全面遵循並相容現代 AI Agent 行業標準 Skills 規範（如 Google Antigravity / Claude Code / Codex / OpenCode）：
+`cyc` 全面遵循並相容現代 AI Agent 行業標準 Skills 規範（如 Google Antigravity / Claude Code / Codex / OpenCode）：
 - **標準 Package 結構**：支援 `<skill_name>/SKILL.md`（含 YAML Frontmatter），以及可選的 `scripts/`、`references/`、`resources/`、`examples/` 輔助目錄。
   ```text
   skills/<skill_name>/
@@ -141,8 +141,8 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
   - **Google Antigravity / Gemini**：自動探索 `~/.gemini/antigravity-cli/builtin/skills/` 與 `~/.gemini/skills/`。
   - **Claude Code**：自動探索 `~/.claude/skills/`（如現有的 `prompt-master`、`agent-reach` 等）。
   - **OpenCode**：自動探索 `~/.config/opencode/skills/`。
-  - **全域與自訂設定**：`~/.config/clichat/skills/` 及 `config.yaml` 的 `skills_dirs` 清單。
-  - **專案工作區規範**：依優先順序載入專案內的 `.agents/skills/`、`.claude/skills/`、`.clichat/skills/` 或 `skills/`。
+  - **全域與自訂設定**：`~/.config/cyc/skills/` 及 `config.yaml` 的 `skills_dirs` 清單。
+  - **專案工作區規範**：依優先順序載入專案內的 `.agents/skills/`、`.claude/skills/`、`.cyc/skills/` 或 `skills/`。
 - **指令用法**：
   - 輸入 `/skills` 表格化列出所有可用技能、其所屬來源（`AGY`, `CLAUDE`, `WORKSPACE`, `BUILT-IN`）與輔助套件說明。
   - 輸入 `/skill <name>` 動態載入技能工作流程至 Agent 指令集中。
@@ -152,7 +152,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 - 輸入 `/fork <id>`：可隨時將現有對話與工具執行歷程分岔至全新會話分支，進行不同方向的實作嘗試。
 
 ### 4.6 雙向寫回橋接器 (Two-Way Bridge / `/sync`)
-`clichat` 不僅能讀取與接續各大外部 AI 編程代理的歷史對話，更能將在 `clichat` 產生的新對話回合、思考過程與工具呼叫**無縫增量寫回**外部代理原生儲存結構中，實現雙向任意切換：
+`cyc` 不僅能讀取與接續各大外部 AI 編程代理的歷史對話，更能將在 `cyc` 產生的新對話回合、思考過程與工具呼叫**無縫增量寫回**外部代理原生儲存結構中，實現雙向任意切換：
 - **Google Antigravity (`agy`)**：寫回 `~/.gemini/antigravity-cli/brain/<uuid>/.system_generated/logs/transcript.jsonl`。
 - **Claude Code (`claude`)**：寫回 `~/.claude/projects/<slug>/<session>.jsonl`。
 - **Pi Agent (`pi`)**：寫回 `~/.pi/agent/sessions/*/<session>.jsonl`。
@@ -168,7 +168,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 ## 5. 安全與信任機制 (Security & Trust)
 
 1. **目錄信任管理 (`/trust`)**：
-   - 首次在未探索的專案目錄執行 Agent 時，`clichat` 會主動詢問是否信任該目錄。
+   - 首次在未探索的專案目錄執行 Agent 時，`cyc` 會主動詢問是否信任該目錄。
    - 若選擇拒絕或未信任，系統自動鎖定為 **唯讀模式 (Read-Only)**，全面阻擋寫檔與指令執行。
    - 隨時使用 `/trust show`、`/trust allow`、`/trust deny` 管理授權。
 2. **彩色 Unified Diff 預覽**：
@@ -191,7 +191,7 @@ git diff | clichat "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `/skills` | 列出所有可用技能（內建 commit, test, refactor，全域或專案專屬） |
 | `/skill <name>` | 動態載入特定技能工作指引至 Agent 系統提示詞中 |
 | `/trust <action>` | 檢視或切換專案工作區信任狀態 (`show`, `allow`, `deny`) |
-| `/sessions <source>` | 列出所有已儲存會話（支援 `all`, `clichat`, `agy`, `claude`, `pi`, `opencode`） |
+| `/sessions <source>` | 列出所有已儲存會話（支援 `all`, `cyc`, `agy`, `claude`, `pi`, `opencode`） |
 | `/resume <id>` | 接續現有會話或跨工具匯入歷史對話 |
 | `/fork <id>` | 將目前會話分岔出獨立分支並立即切換 |
 | `/sync <agent>` | 雙向寫回外部代理（支援 `agy`, `claude`, `pi`, `opencode`，自動或手動指定，原工具可接續開發） |

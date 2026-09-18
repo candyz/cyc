@@ -10,8 +10,8 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from rich.console import Console
 
-from clichat import __version__
-from clichat.agent import (
+from cyc import __version__
+from cyc.agent import (
     AgentLoop,
     PermissionManager,
     PermissionMode,
@@ -23,16 +23,16 @@ from clichat.agent import (
     MCPDynamicTool,
     SkillManager,
 )
-from clichat.adapters import SessionAdapters
-from clichat.completion import get_completion_script
-from clichat.config import Config, init_config_file, load_config
-from clichat.providers import create_provider
-from clichat.providers.base import BaseProvider
-from clichat.session import SessionManager, get_default_context_limit
-from clichat.ui import TerminalUI, create_prompt_session
+from cyc.adapters import SessionAdapters
+from cyc.completion import get_completion_script
+from cyc.config import Config, init_config_file, load_config
+from cyc.providers import create_provider
+from cyc.providers.base import BaseProvider
+from cyc.session import SessionManager, get_default_context_limit
+from cyc.ui import TerminalUI, create_prompt_session
 
 console = Console()
-HISTORY_FILE = Path.home() / ".local" / "share" / "clichat" / "history"
+HISTORY_FILE = Path.home() / ".local" / "share" / "cyc" / "history"
 
 class CliApp:
     def __init__(
@@ -147,7 +147,7 @@ class CliApp:
         session_ids = []
         try:
             filter_agent = agent.lower() if agent else None
-            if not filter_agent or filter_agent in ("all", "clichat"):
+            if not filter_agent or filter_agent in ("all", "cyc"):
                 session_ids.append("LATEST")
                 for s in SessionManager.list_sessions():
                     session_ids.append(s["id"])
@@ -287,7 +287,7 @@ class CliApp:
   /skills                     List available skills (builtin, global, workspace)
   /skill <name>               Apply a specialized skill to agent instructions
   /trust <action>             Check or change current workspace trust status (show/allow/deny)
-  /sessions <source>          List all saved chat & agent sessions (all, clichat, agy, etc.)
+  /sessions <source>          List all saved chat & agent sessions (all, cyc, agy, etc.)
   /resume <id>                Resume a previous session (or latest if omitted)
   /fork <id>                  Fork current session into a new branch
   /sync <agent>               Sync session back to external agent (e.g. /sync agy)
@@ -306,10 +306,10 @@ class CliApp:
   /exit or /quit              Exit CLI""")
             return True
         elif action == "/sessions":
-            # Support: /sessions [all|clichat|agy|claude|pi|opencode]
+            # Support: /sessions [all|cyc|agy|claude|pi|opencode]
             filter_source = arg.lower() if arg else "all"
             sessions = []
-            if filter_source in ("all", "clichat"):
+            if filter_source in ("all", "cyc"):
                 sessions.extend(SessionManager.list_sessions())
             if filter_source in ("all", "agy"):
                 sessions.extend(SessionAdapters.list_agy_sessions())
@@ -331,10 +331,10 @@ class CliApp:
         elif action == "/resume":
             loaded_session = None
             if not arg:
-                # Resume latest clichat session
+                # Resume latest cyc session
                 loaded_session = SessionManager.get_latest_session()
                 if not loaded_session:
-                    # Fallback to latest external session if no clichat session
+                    # Fallback to latest external session if no cyc session
                     agy_list = SessionAdapters.list_agy_sessions()
                     if agy_list:
                         loaded_session = SessionAdapters.import_agy_session(agy_list[0]["id"])
@@ -347,13 +347,13 @@ class CliApp:
                     return True
             else:
                 parts = arg.split(maxsplit=1)
-                agent_names = ("clichat", "agy", "claude", "pi", "opencode")
+                agent_names = ("cyc", "agy", "claude", "pi", "opencode")
 
                 if len(parts) == 2 and parts[0].lower() in agent_names:
                     target_agent = parts[0].lower()
                     target_query = parts[1].strip()
 
-                    if target_agent == "clichat":
+                    if target_agent == "cyc":
                         loaded_session = SessionManager.find_session(target_query)
                     elif target_agent == "agy":
                         clean_query = target_query[4:] if target_query.startswith("agy_") else target_query
@@ -374,7 +374,7 @@ class CliApp:
                 elif len(parts) == 1 and parts[0].lower() in agent_names:
                     # User specified just the agent name e.g. "/resume agy" -> resume latest from that agent
                     target_agent = parts[0].lower()
-                    if target_agent == "clichat":
+                    if target_agent == "cyc":
                         loaded_session = SessionManager.get_latest_session()
                     elif target_agent == "agy":
                         agy_list = SessionAdapters.list_agy_sessions()
@@ -398,7 +398,7 @@ class CliApp:
                         return True
                 else:
                     target_query = arg
-                    # Default: Check clichat sessions first
+                    # Default: Check cyc sessions first
                     loaded_session = SessionManager.find_session(target_query)
 
                     # Check agy if starts with agy_ or matches agy UUID
@@ -422,7 +422,7 @@ class CliApp:
                         loaded_session = SessionAdapters.import_opencode_session(clean_query)
 
                     if not loaded_session:
-                        console.print(f"[bold red]Session not found in clichat, agy, claude, pi, or opencode:[/bold red] {target_query}")
+                        console.print(f"[bold red]Session not found in cyc, agy, claude, pi, or opencode:[/bold red] {target_query}")
                         return True
 
             self.session = loaded_session
@@ -879,7 +879,7 @@ class CliApp:
                     console.print(f"\n[bold red]API Error:[/bold red] {e}\n")
 
             except (KeyboardInterrupt, EOFError):
-                console.print("\n[dim]Exiting clichat...[/dim]")
+                console.print("\n[dim]Exiting cyc...[/dim]")
                 break
 
 def parse_args():
@@ -930,7 +930,7 @@ async def async_main():
             console.print("[yellow]No saved sessions found.[/yellow]")
         return
 
-    # Handle 'clichat init' or 'clichat --init'
+    # Handle 'cyc init' or 'cyc --init'
     is_init_cmd = args.init or (len(args.prompt) == 1 and args.prompt[0].lower() == "init")
     if is_init_cmd:
         try:
@@ -964,13 +964,13 @@ async def async_main():
                 console.print("[yellow]No previous sessions found to resume. Starting new session.[/yellow]")
         else:
             parts = args.resume.split(maxsplit=1)
-            agent_names = ("clichat", "agy", "claude", "pi", "opencode")
+            agent_names = ("cyc", "agy", "claude", "pi", "opencode")
 
             if len(parts) == 2 and parts[0].lower() in agent_names:
                 target_agent = parts[0].lower()
                 target_query = parts[1].strip()
 
-                if target_agent == "clichat":
+                if target_agent == "cyc":
                     resumed_session = SessionManager.find_session(target_query)
                 elif target_agent == "agy":
                     clean_q = target_query[4:] if target_query.startswith("agy_") else target_query
@@ -986,7 +986,7 @@ async def async_main():
                     resumed_session = SessionAdapters.import_opencode_session(clean_q)
             elif len(parts) == 1 and parts[0].lower() in agent_names:
                 target_agent = parts[0].lower()
-                if target_agent == "clichat":
+                if target_agent == "cyc":
                     resumed_session = SessionManager.get_latest_session()
                 elif target_agent == "agy":
                     agy_list = SessionAdapters.list_agy_sessions()
@@ -1006,7 +1006,7 @@ async def async_main():
                         resumed_session = SessionAdapters.import_opencode_session(opencode_list[0]["id"])
             else:
                 query = args.resume
-                # Try clichat
+                # Try cyc
                 resumed_session = SessionManager.find_session(query)
                 # Try agy
                 if not resumed_session:
@@ -1026,7 +1026,7 @@ async def async_main():
                     resumed_session = SessionAdapters.import_opencode_session(clean_q)
 
             if not resumed_session:
-                console.print(f"[bold red]Session not found in clichat, agy, claude, pi, or opencode:[/bold red] {args.resume}. Starting new session.")
+                console.print(f"[bold red]Session not found in cyc, agy, claude, pi, or opencode:[/bold red] {args.resume}. Starting new session.")
 
     # Determine mode and permissions
     if resumed_session and resumed_session.mode and not args.agent:

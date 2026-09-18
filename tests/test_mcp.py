@@ -2,9 +2,9 @@ import asyncio
 import json
 import pytest
 from pathlib import Path
-from clichat.agent.mcp import StdioMCPClient, MCPDynamicTool
-from clichat.agent.tools import ToolRegistry
-from clichat.config import Config, MCPServerConfig
+from cyc.agent.mcp import StdioMCPClient, MCPDynamicTool
+from cyc.agent.tools import ToolRegistry
+from cyc.config import Config, MCPServerConfig
 
 @pytest.mark.asyncio
 async def test_mcp_stdio_client_and_dynamic_tool(tmp_path: Path):

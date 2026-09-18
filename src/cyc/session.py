@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DEFAULT_SESSIONS_DIR = Path.home() / ".local" / "share" / "clichat" / "sessions"
+DEFAULT_SESSIONS_DIR = Path.home() / ".local" / "share" / "cyc" / "sessions"
 
 def estimate_tokens(text: str) -> int:
     """Heuristic token estimation:
@@ -123,7 +123,7 @@ class SessionManager:
         self.auto_save()
 
     def add_tool_message(self, tool_call_id: str, name: str, content: str) -> None:
-        from clichat.agent.tools.base import truncate_tool_output
+        from cyc.agent.tools.base import truncate_tool_output
         safe_content = truncate_tool_output(content)
         self.messages.append({
             "role": "tool",

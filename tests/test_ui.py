@@ -1,5 +1,5 @@
 from prompt_toolkit.document import Document
-from clichat.ui import CommandCompleter, TerminalUI
+from cyc.ui import CommandCompleter, TerminalUI
 
 def test_command_completer():
     completer = CommandCompleter(
@@ -39,7 +39,7 @@ def test_command_completer():
     # Test /sessions completion
     doc_sessions = Document("/sessions ")
     completions_sessions = list(completer.get_completions(doc_sessions, None))
-    assert [c.text for c in completions_sessions] == ["all", "clichat", "agy", "claude", "pi", "opencode"]
+    assert [c.text for c in completions_sessions] == ["all", "cyc", "agy", "claude", "pi", "opencode"]
 
     doc_sessions_pi = Document("/sessions p")
     completions_sessions_pi = list(completer.get_completions(doc_sessions_pi, None))
@@ -49,7 +49,7 @@ def test_command_completer():
     # Test /resume completion
     def fake_get_sessions(agent=None):
         data = {
-            "clichat": ["LATEST", "20260917-103000-abcd"],
+            "cyc": ["LATEST", "20260917-103000-abcd"],
             "agy": ["agy_conv-1234"],
             "claude": ["claude_proj-5678"],
             "pi": ["pi_sess-9999"],
@@ -75,7 +75,7 @@ def test_command_completer():
     assert "claude" in completions_resume
     assert "pi" in completions_resume
     assert "opencode" in completions_resume
-    assert "clichat" in completions_resume
+    assert "cyc" in completions_resume
     assert "LATEST" in completions_resume
 
     # 2. /resume agy [space] offers only agy sessions

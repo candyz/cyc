@@ -3,7 +3,7 @@ import re
 import shutil
 from pathlib import Path
 from typing import List, Optional
-from clichat.agent.tools.base import Tool
+from cyc.agent.tools.base import Tool
 
 MAX_MATCHES = 50
 

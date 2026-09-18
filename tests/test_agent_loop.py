@@ -1,11 +1,11 @@
 import pytest
 from typing import AsyncGenerator, List, Dict, Any, Optional
 
-from clichat.agent.loop import AgentLoop
-from clichat.agent.permissions import PermissionManager, PermissionMode
-from clichat.agent.tools import ToolRegistry, ReadFileTool, WriteFileTool
-from clichat.providers.base import BaseProvider, AgentTurnResponse, ToolCallRequest
-from clichat.session import SessionManager
+from cyc.agent.loop import AgentLoop
+from cyc.agent.permissions import PermissionManager, PermissionMode
+from cyc.agent.tools import ToolRegistry, ReadFileTool, WriteFileTool
+from cyc.providers.base import BaseProvider, AgentTurnResponse, ToolCallRequest
+from cyc.session import SessionManager
 
 
 class MockAgentProvider(BaseProvider):
@@ -141,7 +141,7 @@ async def test_agent_loop_truncates_oversized_tool_output(tmp_path):
 
 @pytest.mark.asyncio
 async def test_agent_loop_graceful_cancellation():
-    from clichat.agent.tools.base import Tool
+    from cyc.agent.tools.base import Tool
 
     class HangingTool(Tool):
         name = "hanging_tool"

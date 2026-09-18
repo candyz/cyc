@@ -1,8 +1,8 @@
-"""Shell completion generation (Bash & Zsh) for clichat CLI."""
+"""Shell completion generation (Bash & Zsh) for cyc CLI."""
 
-BASH_COMPLETION_SCRIPT = r"""# bash completion for clichat
+BASH_COMPLETION_SCRIPT = r"""# bash completion for cyc
 
-_clichat_completion() {
+_cyc_completion() {
     local cur prev opts providers
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -21,12 +21,12 @@ _clichat_completion() {
             return 0
             ;;
         -r|--resume)
-            local session_dir="${HOME}/.local/share/clichat/sessions"
+            local session_dir="${HOME}/.local/share/cyc/sessions"
             local sessions=""
             if [ -d "${session_dir}" ]; then
                 sessions=$(find "${session_dir}" -name "*.json" -exec basename {} .json \; 2>/dev/null)
             fi
-            COMPREPLY=( $(compgen -W "${sessions} LATEST agy claude pi opencode clichat" -- "${cur}") )
+            COMPREPLY=( $(compgen -W "${sessions} LATEST agy claude pi opencode cyc" -- "${cur}") )
             return 0
             ;;
         --completion)
@@ -45,12 +45,12 @@ _clichat_completion() {
     fi
 }
 
-complete -F _clichat_completion clichat
+complete -F _cyc_completion cyc
 """
 
-ZSH_COMPLETION_SCRIPT = r"""#compdef clichat
+ZSH_COMPLETION_SCRIPT = r"""#compdef cyc
 
-_clichat() {
+_cyc() {
     local -a opts
     opts=(
         '(-v --version)'{-v,--version}'[Show version information]'
@@ -73,7 +73,7 @@ _clichat() {
     _arguments -s $opts
 }
 
-_clichat "$@"
+_cyc "$@"
 """
 
 def get_completion_script(shell: str = "bash") -> str:

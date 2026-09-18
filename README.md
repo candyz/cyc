@@ -1,4 +1,4 @@
-# clichat
+# cyc
 
 現代化終端 CLI 對話工具，支援本地端模型（Ollama、OMLX）與雲端模型（OpenRouter、NVIDIA NIM、Google Gemini）。
 
@@ -7,41 +7,41 @@
 - **多後端無縫切換**：支援本地 Ollama、OMLX (Apple Silicon MLX)、Google Antigravity (`agy`，直連 Gemini AI Pro 訂閱額度)、OpenCode (`opencode`，直連 Zen free 免費模型) 及各大雲端 API (Gemini, OpenRouter, NVIDIA NIM)。
 - **即時 Markdown 串流渲染**：結合 `rich.live.Live`，文字隨生成即時渲染 Markdown 格式、程式碼區塊高亮與排版。
 - **互動式 REPL 與智慧補全**：
-  - 輸入歷史自動跨終端持久化保存 (`~/.local/share/clichat/history`)。
+  - 輸入歷史自動跨終端持久化保存 (`~/.local/share/cyc/history`)。
   - Tab 智慧自動補全 Slash 指令、動態拉取之模型名稱 (`/model `)、提供者名稱 (`/provider `) 及本地檔案路徑 (`/save `, `/load `)。
   - 支援單行與多行編輯模式切換 (`/multiline`)、`Alt+Enter` 隨時插入換行。
   - `Ctrl+C` 訊號優雅中斷當前生成，不崩潰、不中斷對話。
 - **會話與 Token 管理**：
   - Context Token 自動估算與超長自動滑動窗口裁切（保障 System Prompt 永遠留存）。
   - 會話支援匯出為 Markdown 或完整結構化 JSON，並可隨時載入續聊。
-- **Pipeline 管線模式**：支援 Unix 管道輸入，例如 `cat error.log | clichat "分析此日誌"`。
-- **彈性配置**：支援 `~/.config/clichat/config.yaml` 並自動解析環境變數 `${API_KEY}`。
+- **Pipeline 管線模式**：支援 Unix 管道輸入，例如 `cat error.log | cyc "分析此日誌"`。
+- **彈性配置**：支援 `~/.config/cyc/config.yaml` 並自動解析環境變數 `${API_KEY}`。
 
 ## 安裝與執行
 
 ### 快速開始
 
 ```bash
-# 1. 初始化預設設定檔 (~/.config/clichat/config.yaml)
-uv run clichat init
+# 1. 初始化預設設定檔 (~/.config/cyc/config.yaml)
+uv run cyc init
 
 # 2. 啟動互動式聊天 (預設使用本地 Ollama)
-uv run clichat
+uv run cyc
 
 # 3. 指定 Provider 與 Model
-uv run clichat -p agy -m "gemini-3.1-pro-high"                             # 使用本機 agy，直連 Gemini Pro 訂閱額度
-uv run clichat -p opencode -m "opencode/nemotron-3.5-lightning-free"      # 使用本機 opencode，直連 Zen free 免費模型
-uv run clichat -p gemini -m "gemini-2.5-flash"                              # 使用 Google AI Studio API Key
-uv run clichat -p ollama -m "llama3.3:latest"
+uv run cyc -p agy -m "gemini-3.1-pro-high"                             # 使用本機 agy，直連 Gemini Pro 訂閱額度
+uv run cyc -p opencode -m "opencode/nemotron-3.5-lightning-free"      # 使用本機 opencode，直連 Zen free 免費模型
+uv run cyc -p gemini -m "gemini-2.5-flash"                              # 使用 Google AI Studio API Key
+uv run cyc -p ollama -m "llama3.3:latest"
 
 # 4. 單次問答 / Pipeline 模式
-uv run clichat "什麼是量子計算？"
-cat main.py | uv run clichat "請幫我 code review 這段程式碼"
+uv run cyc "什麼是量子計算？"
+cat main.py | uv run cyc "請幫我 code review 這段程式碼"
 ```
 
 ### 全域 CLI 安裝
 
-您可以將 `clichat` 安裝為系統全域命令，在任何終端機目錄下直接呼叫：
+您可以將 `cyc` 安裝為系統全域命令，在任何終端機目錄下直接呼叫：
 
 ```bash
 # 方法 A: 透過 uv tool 全域安裝 (推薦)
@@ -51,7 +51,7 @@ uv tool install .
 pipx install .
 
 # 安裝完成後直接呼叫
-clichat
+cyc
 ```
 
 
@@ -78,7 +78,7 @@ clichat
 | `/skills` | 列出所有可用技能（內建 commit, test, refactor，全域或專案專屬） |
 | `/skill <name>` | 動態載入技能工作流程指引至 Agent 指令集中 |
 | `/trust <action>` | 檢視或切換當前專案工作區的信任授權狀態（show, allow, deny） |
-| `/sessions <source>` | 列出所有已儲存會話（支援 all, clichat, agy, claude, pi, opencode） |
+| `/sessions <source>` | 列出所有已儲存會話（支援 all, cyc, agy, claude, pi, opencode） |
 | `/resume <id>` | 接續或跨代理匯入歷史會話 |
 | `/fork <id>` | 將目前會話分岔出獨立分支並立即切換 |
 | `/sync [agent]` | 雙向寫回外部代理（支援 agy, claude, pi, opencode，原工具可接續開發） |

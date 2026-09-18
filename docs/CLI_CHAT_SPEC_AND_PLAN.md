@@ -61,10 +61,10 @@ flowchart TD
    - 支援對話歷程自動儲存（JSONL / SQLite）。
    - 指令：`/clear` 清空對話、`/save <filename>` 匯出 Markdown/JSON、`/history` 查看過往會話。
 4. **單次問答與管線模式 (Pipeline mode)**：
-   - 支援管道輸入：`cat file.txt | clichat "請總結這段內容"`。
+   - 支援管道輸入：`cat file.txt | cyc "請總結這段內容"`。
    - 支援非互動式即時輸出，方便與 Shell Script 整合。
 
-### 2.2 設定檔規範 (`~/.config/clichat/config.yaml`)
+### 2.2 設定檔規範 (`~/.config/cyc/config.yaml`)
 
 ```yaml
 # 預設使用的提供者與模型
@@ -114,8 +114,8 @@ ui:
 ## 3. 模組設計 (Module Design)
 
 ```
-clichat/
-├── config.py         # 讀取 ~/.config/clichat/config.yaml 與環境變數
+cyc/
+├── config.py         # 讀取 ~/.config/cyc/config.yaml 與環境變數
 ├── providers/        # 提供者介面與實作
 │   ├── base.py       # BaseProvider 抽像類別 (定義 chat_stream, list_models)
 │   ├── openai.py     # 涵蓋 Ollama, OMLX, OpenRouter, NVIDIA 的通用 OpenAI 適配器
@@ -182,7 +182,7 @@ class BaseProvider(ABC):
 
 ### Phase 4: 打包與發布 (預估 1 天) [已完成]
 - [x] 提供全域 CLI 命令安裝 (`pip install -e .`、`uv tool install .` 或 `pipx`)
-- [x] 提供預設設定檔生成精靈 (`clichat init` / `clichat --init [-f]`)
+- [x] 提供預設設定檔生成精靈 (`cyc init` / `cyc --init [-f]`)
 - [x] 撰寫單元測試與 Mock 串流測試 (涵蓋 OpenAI Compatible 與 Gemini Provider，共 19 項測試通過)
 - [x] 完成 Wheel 與 Source Distribution 建置驗證 (`uv build`)
 
@@ -191,7 +191,7 @@ class BaseProvider(ABC):
 ## 5. 驗證與測試策略 (Verification & Testing)
 
 1. **本地端整合驗證**：
-   - 啟動本地 `ollama serve`，執行 `clichat --provider ollama` 驗證本地推論。
+   - 啟動本地 `ollama serve`，執行 `cyc --provider ollama` 驗證本地推論。
    - 啟動 `omlx` 伺服器，驗證 OMLX endpoint 回應正確性。
 2. **雲端端點串接驗證**：
    - 設定 `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`，輪流切換各模型測試問答。

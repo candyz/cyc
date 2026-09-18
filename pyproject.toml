@@ -1,5 +1,5 @@
 [project]
-name = "clichat"
+name = "cyc"
 version = "0.12.0"
 description = "CLI chat and autonomous coding agent for local and cloud LLMs"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-clichat = "clichat.cli:main"
+cyc = "cyc.cli:main"
 
 [build-system]
 requires = ["hatchling"]

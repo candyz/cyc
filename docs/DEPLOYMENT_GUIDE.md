@@ -1,6 +1,6 @@
-# clichat 部署與配置指南 (Deployment Guide)
+# cyc 部署與配置指南 (Deployment Guide)
 
-本文件說明 `clichat` 的環境相依性、安裝方式、設定檔配置、多 Provider 認證設定、MCP 外部工具擴充及 Shell 自動補全設置。
+本文件說明 `cyc` 的環境相依性、安裝方式、設定檔配置、多 Provider 認證設定、MCP 外部工具擴充及 Shell 自動補全設置。
 
 ---
 
@@ -19,11 +19,11 @@
 
 ```bash
 # 從原始碼專案目錄安裝為全域指令
-cd clichat
+cd cyc
 uv tool install .
 
 # 安裝完成後，直接在任何目錄執行：
-clichat --version
+cyc --version
 ```
 
 若欲更新至最新版程式碼：
@@ -39,25 +39,25 @@ pipx install .
 ### 2.3 開發環境安裝 (Development Mode)
 若是開發者需要直接修改程式碼並執行：
 ```bash
-git clone https://github.com/your-repo/clichat.git
-cd clichat
+git clone https://github.com/your-repo/cyc.git
+cd cyc
 uv sync
-uv run clichat
+uv run cyc
 ```
 
 ---
 
 ## 3. 設定檔配置 (Configuration)
 
-`clichat` 的全域配置檔位於 `~/.config/clichat/config.yaml`。
+`cyc` 的全域配置檔位於 `~/.config/cyc/config.yaml`。
 
 ### 3.1 自動產生設定檔
 ```bash
 # 初始化產生預設配置檔
-clichat init
+cyc init
 
 # 若已有設定檔，使用 -f 強制覆寫重設
-clichat init -f
+cyc init -f
 ```
 
 ### 3.2 設定檔結構解析
@@ -153,7 +153,7 @@ export OPENROUTER_API_KEY="sk-or-v1-YourOpenRouterKeyHere"
   ```bash
   which agy
   ```
-- `clichat` 會自動透過子進程調用本機登入憑證，完全無需重複配置 API Key。
+- `cyc` 會自動透過子進程調用本機登入憑證，完全無需重複配置 API Key。
 
 ### 4.4 OpenCode (`opencode`)
 - 確保本機已安裝 `opencode`：
@@ -166,9 +166,9 @@ export OPENROUTER_API_KEY="sk-or-v1-YourOpenRouterKeyHere"
 
 ## 5. Model Context Protocol (MCP) 伺服器整合
 
-`clichat` 完整支援 Anthropic 發起之開放協定 **MCP (Model Context Protocol)**，可輕鬆擴充外部資料庫、瀏覽器或專用工具：
+`cyc` 完整支援 Anthropic 發起之開放協定 **MCP (Model Context Protocol)**，可輕鬆擴充外部資料庫、瀏覽器或專用工具：
 
-在 `~/.config/clichat/config.yaml` 中增加 `mcp_servers` 區塊：
+在 `~/.config/cyc/config.yaml` 中增加 `mcp_servers` 區塊：
 
 ```yaml
 mcp_servers:
@@ -186,13 +186,13 @@ mcp_servers:
     cwd: "/path/to/workdir"
 ```
 
-啟動 `clichat --agent` 時，系統會自動啟動子進程連線，並透過 `/tools` 呈現外部掛載的 MCP 工具。
+啟動 `cyc --agent` 時，系統會自動啟動子進程連線，並透過 `/tools` 呈現外部掛載的 MCP 工具。
 
 ---
 
 ## 6. Shell Tab 自動補全配置 (Auto-completion)
 
-`clichat` 內建完整的 Shell 補全生成器，支援 Bash 與 Zsh。
+`cyc` 內建完整的 Shell 補全生成器，支援 Bash 與 Zsh。
 
 ### 6.1 Bash 配置
 
@@ -201,10 +201,10 @@ mcp_servers:
 ```bash
 # 產生並儲存補全腳本
 mkdir -p ~/.local/share/bash-completion/completions
-clichat --completion bash > ~/.local/share/bash-completion/completions/clichat
+cyc --completion bash > ~/.local/share/bash-completion/completions/cyc
 
 # 或直接於 ~/.bashrc 中 eval
-echo 'eval "$(clichat --completion bash)"' >> ~/.bashrc
+echo 'eval "$(cyc --completion bash)"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -213,22 +213,22 @@ source ~/.bashrc
 在 `~/.zshrc` 中加入：
 
 ```zsh
-eval "$(clichat --completion zsh)"
+eval "$(cyc --completion zsh)"
 ```
 
-重新載入終端後，輸入 `clichat -` 或 `clichat --` 並按下 `Tab` 鍵，即可自動補全所有參數與 Provider 名稱！
+重新載入終端後，輸入 `cyc -` 或 `cyc --` 並按下 `Tab` 鍵，即可自動補全所有參數與 Provider 名稱！
 
 ---
 
 ## 7. 檔案與目錄結構
 
-`clichat` 運行時會自動在使用者家目錄建立以下目錄：
+`cyc` 運行時會自動在使用者家目錄建立以下目錄：
 
 | 目錄路徑 | 用途 |
 | :--- | :--- |
-| `~/.config/clichat/config.yaml` | 全域主要設定檔 |
-| `~/.config/clichat/skills/` | 全域使用者自訂技能目錄（放入 `.md` 即可擴充） |
-| `~/.config/clichat/trusted_workspaces.json` | 專案目錄安全信任白名單記錄 |
-| `~/.local/share/clichat/history` | REPL 互動歷史紀錄（跨終端保留） |
-| `~/.local/share/clichat/sessions/` | 結構化會話 JSON 與 Append-only `.events.jsonl` 事件日誌 |
-| `.clichat/skills/` | 特定專案本地專屬技能（依各 repo 自訂） |
+| `~/.config/cyc/config.yaml` | 全域主要設定檔 |
+| `~/.config/cyc/skills/` | 全域使用者自訂技能目錄（放入 `.md` 即可擴充） |
+| `~/.config/cyc/trusted_workspaces.json` | 專案目錄安全信任白名單記錄 |
+| `~/.local/share/cyc/history` | REPL 互動歷史紀錄（跨終端保留） |
+| `~/.local/share/cyc/sessions/` | 結構化會話 JSON 與 Append-only `.events.jsonl` 事件日誌 |
+| `.cyc/skills/` | 特定專案本地專屬技能（依各 repo 自訂） |

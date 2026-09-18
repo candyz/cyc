@@ -1,5 +1,5 @@
 from pathlib import Path
-from clichat.session import Session, SessionManager, estimate_tokens
+from cyc.session import Session, SessionManager, estimate_tokens
 
 def test_session_message_flow():
     session = Session(system_prompt="You are a helpful assistant.")
@@ -131,7 +131,7 @@ def test_session_undo():
 
 
 def test_dynamic_context_limits():
-    from clichat.session import get_default_context_limit
+    from cyc.session import get_default_context_limit
 
     # Gemini / Agy models
     assert get_default_context_limit("gemini", "gemini-2.5-flash") == 1_000_000

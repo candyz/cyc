@@ -1,7 +1,7 @@
 import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from openai import AsyncOpenAI
-from clichat.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest, retry_async
+from cyc.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest, retry_async
 
 class OpenAICompatibleProvider(BaseProvider):
     def __init__(self, base_url: str, api_key: str):
@@ -88,7 +88,7 @@ class OpenAICompatibleProvider(BaseProvider):
                     "https://openrouter.ai/api/v1/auth/key",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
-                        "User-Agent": "clichat",
+                        "User-Agent": "cyc",
                     }
                 )
                 with urllib.request.urlopen(req, timeout=5) as response:

@@ -2,7 +2,7 @@ import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional
 from google import genai
 from google.genai import types
-from clichat.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest, retry_async
+from cyc.providers.base import AgentTurnResponse, BaseProvider, ToolCallRequest, retry_async
 
 class GeminiProvider(BaseProvider):
     def __init__(self, api_key: str):

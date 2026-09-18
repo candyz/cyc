@@ -5,11 +5,11 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from clichat.agent.permissions import PermissionManager
-from clichat.agent.tools import ToolRegistry, truncate_tool_output, enrich_tool_error_observation
-from clichat.providers.base import AgentTurnResponse, BaseProvider
-from clichat.providers.gemini import GeminiProvider
-from clichat.session import SessionManager
+from cyc.agent.permissions import PermissionManager
+from cyc.agent.tools import ToolRegistry, truncate_tool_output, enrich_tool_error_observation
+from cyc.providers.base import AgentTurnResponse, BaseProvider
+from cyc.providers.gemini import GeminiProvider
+from cyc.session import SessionManager
 
 console = Console()
 

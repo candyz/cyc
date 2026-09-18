@@ -1,10 +1,10 @@
 from typing import Optional
-from clichat.config import Config, ProviderConfig
-from clichat.providers.base import BaseProvider
-from clichat.providers.openai import OpenAICompatibleProvider
-from clichat.providers.gemini import GeminiProvider
-from clichat.providers.agy import AntigravityProvider
-from clichat.providers.opencode import OpenCodeProvider
+from cyc.config import Config, ProviderConfig
+from cyc.providers.base import BaseProvider
+from cyc.providers.openai import OpenAICompatibleProvider
+from cyc.providers.gemini import GeminiProvider
+from cyc.providers.agy import AntigravityProvider
+from cyc.providers.opencode import OpenCodeProvider
 
 def create_provider(provider_config: ProviderConfig) -> BaseProvider:
     provider_type = provider_config.type.lower()

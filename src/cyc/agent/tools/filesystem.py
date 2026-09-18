@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from clichat.agent.tools.base import Tool
+from cyc.agent.tools.base import Tool
 
 MAX_READ_LINES = 250
 MAX_READ_BYTES = 30 * 1024  # 30 KB limit

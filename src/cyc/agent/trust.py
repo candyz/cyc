@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 console = Console()
-DEFAULT_TRUST_FILE = Path.home() / ".local" / "share" / "clichat" / "trusted_workspaces.json"
+DEFAULT_TRUST_FILE = Path.home() / ".local" / "share" / "cyc" / "trusted_workspaces.json"
 
 
 class WorkspaceTrustManager:
@@ -69,7 +69,7 @@ class WorkspaceTrustManager:
             "(e.g. running shell commands, writing/editing files).\n\n"
             "  [bold green][y] Trust Workspace[/bold green]   - Enable full agent operations and mutations\n"
             "  [bold yellow][n] Do Not Trust[/bold yellow]     - Run in restricted [yellow]Read-Only[/yellow] mode\n"
-            "  [bold red][q] Quit[/bold red]             - Exit clichat immediately"
+            "  [bold red][q] Quit[/bold red]             - Exit cyc immediately"
         )
         console.print(Panel(
             body,

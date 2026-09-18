@@ -18,7 +18,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.theme import Theme
 
-from clichat import __version__
+from cyc import __version__
 
 custom_theme = Theme({
     "info": "dim cyan",
@@ -104,7 +104,7 @@ class CommandCompleter(Completer):
                     yield Completion(strat, start_position=-len(arg_prefix))
         elif cmd == "/skill":
             try:
-                from clichat.agent.skills import SkillManager
+                from cyc.agent.skills import SkillManager
                 for s in SkillManager.list_skills():
                     name = s["name"]
                     if name.startswith(arg_prefix.lower()):
@@ -128,8 +128,8 @@ class CommandCompleter(Completer):
                 if p.lower().startswith(arg_prefix.lower()):
                     yield Completion(p, start_position=-len(arg_prefix))
         elif cmd == "/sessions":
-            # Tab completion for sources: all, clichat, agy, claude, pi, opencode
-            sources = ["all", "clichat", "agy", "claude", "pi", "opencode"]
+            # Tab completion for sources: all, cyc, agy, claude, pi, opencode
+            sources = ["all", "cyc", "agy", "claude", "pi", "opencode"]
             for s in sources:
                 if s.startswith(arg_prefix.lower()):
                     yield Completion(s, start_position=-len(arg_prefix))
@@ -137,7 +137,7 @@ class CommandCompleter(Completer):
             if self.get_sessions:
                 # Check if user has typed an agent prefix, e.g. "/resume agy "
                 resume_parts = arg_prefix.split(maxsplit=1)
-                agent_names = ["clichat", "agy", "claude", "pi", "opencode"]
+                agent_names = ["cyc", "agy", "claude", "pi", "opencode"]
 
                 if not resume_parts:
                     # User typed "/resume " with no text yet
@@ -185,7 +185,7 @@ class TerminalUI:
     def print_banner(self, provider: str, model: str, multiline: bool = False, mode: str = "chat"):
         mode_label = "[bold magenta]🤖 Coding Agent Mode[/bold magenta]" if mode == "agent" else "[dim]💬 Chat Mode[/dim]"
         ml_label = "[magenta]Multi-line[/magenta]" if multiline else "[dim]Single-line[/dim]"
-        title = f"[bold green]clichat[/bold green] [dim]v{__version__}[/dim]"
+        title = f"[bold green]cyc[/bold green] [dim]v{__version__}[/dim]"
         body = (
             f"Provider: [bold cyan]{provider}[/bold cyan]  |  Model: [bold cyan]{model}[/bold cyan]  |  {mode_label}  |  {ml_label}\n"
             f"[dim]Commands: /help, /mode [chat|agent], /tools, /sessions, /resume, /models, /model <name>, /provider <name>, /exit[/dim]"
@@ -260,7 +260,7 @@ class TerminalUI:
             prov = s.get('provider') or '-'
             mod = s.get('model') or '-'
             prov_model = f"{prov}/{mod}"
-            agent_source = s.get("agent", "clichat").upper()
+            agent_source = s.get("agent", "cyc").upper()
             if agent_source == "AGY":
                 agent_col = "[bold cyan]AGY[/bold cyan]"
             elif agent_source == "CLAUDE":
@@ -270,7 +270,7 @@ class TerminalUI:
             elif agent_source == "OPENCODE":
                 agent_col = "[bold blue]OPENCODE[/bold blue]"
             else:
-                agent_col = "[bold green]CLICHAT[/bold green]"
+                agent_col = "[bold green]CYC[/bold green]"
 
             table.add_row(
                 agent_col,

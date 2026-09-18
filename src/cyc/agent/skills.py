@@ -16,12 +16,12 @@ Supports:
      - ~/.codex/skills/
      - ~/.hermes/skills/
   6. Standard Clichat Global directory:
-     - ~/.config/clichat/skills/
+     - ~/.config/cyc/skills/
   7. User-configured custom paths via config.yaml (`skills_dirs`)
   8. Workspace-level project skills:
      - <workspace>/.agents/skills/ (Standard Antigravity / Agent workspace layout)
      - <workspace>/.claude/skills/
-     - <workspace>/.clichat/skills/
+     - <workspace>/.cyc/skills/
      - <workspace>/skills/
 """
 
@@ -73,7 +73,7 @@ When preparing or committing changes:
 
 # Standard Global / Tool Skills Directories
 GLOBAL_SKILL_SEARCH_PATHS = [
-    ("clichat", Path.home() / ".config" / "clichat" / "skills"),
+    ("cyc", Path.home() / ".config" / "cyc" / "skills"),
     ("antigravity", Path.home() / ".gemini" / "antigravity-cli" / "builtin" / "skills"),
     ("gemini", Path.home() / ".gemini" / "skills"),
     ("claude", Path.home() / ".claude" / "skills"),
@@ -86,7 +86,7 @@ GLOBAL_SKILL_SEARCH_PATHS = [
 WORKSPACE_SKILL_SUBDIRS = [
     ("workspace:agents", Path(".agents") / "skills"),
     ("workspace:claude", Path(".claude") / "skills"),
-    ("workspace:clichat", Path(".clichat") / "skills"),
+    ("workspace:cyc", Path(".cyc") / "skills"),
     ("workspace", Path("skills")),
 ]
 

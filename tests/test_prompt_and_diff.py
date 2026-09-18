@@ -1,21 +1,21 @@
 from pathlib import Path
 import pytest
-from clichat.agent.prompt import build_coding_agent_system_prompt
-from clichat.agent.diff import generate_unified_diff, render_diff_panel
+from cyc.agent.prompt import build_coding_agent_system_prompt
+from cyc.agent.diff import generate_unified_diff, render_diff_panel
 
 def test_build_coding_agent_system_prompt_default():
     prompt = build_coding_agent_system_prompt()
-    assert "You are clichat Coding Agent" in prompt
+    assert "You are cyc Coding Agent" in prompt
     assert "Workspace Environment:" in prompt
     assert "Core Operating Principles:" in prompt
 
-def test_build_coding_agent_system_prompt_with_clichat_md(tmp_path: Path, monkeypatch):
+def test_build_coding_agent_system_prompt_with_cyc_md(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    clichat_md = tmp_path / "CLICHAT.md"
-    clichat_md.write_text("Always use TypeScript and adhere to ESLint rules.", encoding="utf-8")
+    cyc_md = tmp_path / "CYC.md"
+    cyc_md.write_text("Always use TypeScript and adhere to ESLint rules.", encoding="utf-8")
 
     prompt = build_coding_agent_system_prompt()
-    assert "Project Guidelines (CLICHAT.md):" in prompt
+    assert "Project Guidelines (CYC.md):" in prompt
     assert "Always use TypeScript and adhere to ESLint rules." in prompt
 
 def test_build_coding_agent_system_prompt_with_agents_md(tmp_path: Path, monkeypatch):

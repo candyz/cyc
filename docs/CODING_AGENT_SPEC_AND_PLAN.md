@@ -2,11 +2,11 @@
 
 ## 1. 可行性評估 (Feasibility Analysis)
 
-將現有以對話為主的 `clichat` 工具演進為全功能 **Coding Agent**（自動化代碼編寫、終端指令執行、專案分析修復），**技術可行性極高且具有清晰的演進路徑**。
+將現有以對話為主的 `cyc` 工具演進為全功能 **Coding Agent**（自動化代碼編寫、終端指令執行、專案分析修復），**技術可行性極高且具有清晰的演進路徑**。
 
 ### 1.1 現有架構延伸性分析
 
-`clichat` 在前期階段已具備優良的模組化基底，為 Coding Agent 的開發打下了堅實基礎：
+`cyc` 在前期階段已具備優良的模組化基底，為 Coding Agent 的開發打下了堅實基礎：
 - **Provider 抽象層 (`BaseProvider`)**：已封裝非同步串流呼叫，擴充 `tools` / `function_call` 參數時不需顛覆現有 API。
 - **會話管理層 (`SessionManager`)**：具備 Token 估算、滑動窗口裁剪、JSON/Markdown 持久化，可直接擴展支援 `tool_calls` 與 `tool` 角色訊息。
 - **終端介面層 (`TerminalUI`)**：結合 `rich` 與 `prompt_toolkit`，已具備高亮、表格、即時渲染能力，可直接擴充 Tool 呼叫卡片與代碼 Diff 呈現。
@@ -82,7 +82,7 @@ Coding Agent 必須具備以下核心工具：
 為各後端提供統一的 Python 工具註冊定義，並自動轉譯成對應後端的格式：
 
 ```python
-# src/clichat/agent/tools/base.py 示意
+# src/cyc/agent/tools/base.py 示意
 class Tool(ABC):
     name: str
     description: str
@@ -122,13 +122,13 @@ class Tool(ABC):
 1. **Tool Invocation 卡片**：
    ```
    ╭─ ⚙️  Tool Call: read_file ────────────────────────────╮
-   │ path: src/clichat/config.py, start_line: 1, end_line: 30 │
+   │ path: src/cyc/config.py, start_line: 1, end_line: 30 │
    ╰───────────────────────────────────────────────────────╯
    ```
 2. **變更確認提示 (帶 Diff 預覽)**：
    ```
    ╭─ ⚠️  Permission Request: replace_file_content ────────╮
-   │ File: src/clichat/cli.py                               │
+   │ File: src/cyc/cli.py                               │
    │                                                        │
    │ - def parse_args():                                    │
    │ + def parse_args(sys_argv=None):                       │
@@ -141,7 +141,7 @@ class Tool(ABC):
 ## 3. 分階段實作計劃 (Implementation Plan)
 
 ### Phase 1: 核心工具集與統一 Tool 抽象介面 (預估 2 天)
-- [x] 建立 `src/clichat/agent/tools/` 模組目錄。
+- [x] 建立 `src/cyc/agent/tools/` 模組目錄。
 - [x] 實作 `Tool` 基礎抽象類別，包含 JSON Schema 生成與 OpenAI/Gemini 適配器。
 - [x] 實作 6 大核心內建工具：
   - `read_file` (支援行號切片與超長防護)
@@ -180,7 +180,7 @@ class Tool(ABC):
 
 ### Phase 5: MCP (Model Context Protocol) 擴充支援 (預估 2 天)
 - [ ] 支援外部 MCP Server 接入（透過 stdio 串接）。
-- [ ] 在 `~/.config/clichat/config.yaml` 中新增 `mcp_servers` 設定區塊。
+- [ ] 在 `~/.config/cyc/config.yaml` 中新增 `mcp_servers` 設定區塊。
 - [ ] 動態將 MCP 工具註冊至 Agent 工具清單中。
 
 ---
