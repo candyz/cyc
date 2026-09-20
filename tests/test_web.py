@@ -160,4 +160,32 @@ def test_web_sse_streaming(web_test_client):
     assert "text/event-stream" in res.headers.get("content-type", "")
 
 
+@pytest.mark.asyncio
+async def test_run_web_server_startup(tmp_path):
+    from cyc.web.server import run_web_server
+    import asyncio
+    config = Config(**DEFAULT_CONFIG_DICT)
+    config.web.port = 18889
+
+    # Start run_web_server as task and stop quickly
+    task = asyncio.create_task(
+        run_web_server(
+            config=config,
+            host="127.0.0.1",
+            port=18889,
+            auth_token="test_token",
+            open_browser=False,
+            workspace_path=tmp_path,
+        )
+    )
+    # Wait briefly for server to bind
+    await asyncio.sleep(0.3)
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+
 

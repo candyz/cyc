@@ -17,7 +17,7 @@ from cyc.web.app import create_app
 console = Console()
 
 
-def run_web_server(
+async def run_web_server(
     config: Optional[Config] = None,
     host: Optional[str] = None,
     port: Optional[int] = None,
@@ -67,4 +67,7 @@ def run_web_server(
         uvicorn_kwargs["ssl_certfile"] = cfg.web.ssl_cert
         uvicorn_kwargs["ssl_keyfile"] = cfg.web.ssl_key
 
-    uvicorn.run(app, **uvicorn_kwargs)
+    server_config = uvicorn.Config(app, **uvicorn_kwargs)
+    server = uvicorn.Server(server_config)
+    await server.serve()
+

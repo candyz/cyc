@@ -957,7 +957,7 @@ async def async_main():
     is_web_cmd = args.web or (len(args.prompt) == 1 and args.prompt[0].lower() == "web")
     if is_web_cmd:
         from cyc.web.server import run_web_server
-        run_web_server(
+        await run_web_server(
             config=config,
             host=args.host,
             port=args.port,
