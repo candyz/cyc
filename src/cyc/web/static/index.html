@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .prose pre { background: #1e1e1e; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
@@ -28,7 +29,7 @@
   <header class="bg-zinc-900 border-b border-zinc-800 px-4 py-2.5 flex items-center justify-between shrink-0">
     <div class="flex items-center space-x-3">
       <span class="font-extrabold text-xl tracking-wider text-emerald-400">cyc</span>
-      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v0.16.0</span>
+      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v0.17.0</span>
       <div class="hidden sm:flex items-center space-x-2 text-xs text-zinc-400 border-l border-zinc-700 pl-3">
         <span>Workspace:</span>
         <span class="text-zinc-200 font-mono" id="wsName">loading...</span>
@@ -112,11 +113,31 @@
         <div class="relative bg-zinc-800/90 border border-zinc-700 rounded-xl p-2 focus-within:border-emerald-500">
           <textarea id="promptInput" rows="2" class="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none" placeholder="輸入您的指令或提示詞 (Enter 送出, Shift+Enter 換行)..."></textarea>
           <div class="flex items-center justify-between pt-1 text-xs text-zinc-500">
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center space-x-3">
               <label class="flex items-center space-x-1 cursor-pointer hover:text-zinc-300">
                 <input type="checkbox" id="checkAutoApprove" class="rounded bg-zinc-700 border-zinc-600 text-emerald-500">
                 <span>免確認 (Auto Approve)</span>
               </label>
+
+              <!-- Strategy & Max Turns -->
+              <div class="hidden sm:flex items-center space-x-1.5 border-l border-zinc-700 pl-2">
+                <span class="text-zinc-400">Loop:</span>
+                <select id="selectStrategy" class="bg-zinc-800 border border-zinc-700 text-zinc-200 text-[11px] rounded px-1.5 py-0.5 focus:outline-none">
+                  <option value="standard">standard</option>
+                  <option value="plan">plan</option>
+                  <option value="minimal">minimal</option>
+                </select>
+                <input type="number" id="inputMaxTurns" value="100" min="1" max="500" class="w-12 bg-zinc-800 border border-zinc-700 text-zinc-200 text-[11px] rounded px-1 py-0.5 text-center focus:outline-none" title="Agent 最大循環輪數 (Max Turns)">
+              </div>
+
+              <!-- Stream Channel Toggle: WS or SSE -->
+              <div class="hidden md:flex items-center space-x-1 border-l border-zinc-700 pl-2">
+                <label class="flex items-center space-x-1 cursor-pointer hover:text-zinc-300" title="勾選時使用 Server-Sent Events (SSE) 串流通道，未勾選使用 WebSocket">
+                  <input type="checkbox" id="checkUseSse" class="rounded bg-zinc-700 border-zinc-600 text-emerald-500">
+                  <span>SSE 串流</span>
+                </label>
+              </div>
+
               <span id="agentStatus" class="text-emerald-400 font-mono hidden">● 思考中...</span>
             </div>
             <div class="flex items-center space-x-2">
@@ -151,9 +172,12 @@
         <button id="btnClearPreview" class="text-zinc-500 hover:text-zinc-300 text-xs">清除</button>
       </div>
 
-      <!-- Tab 1: Preview & Observations -->
-      <div class="flex-1 overflow-y-auto p-3 text-xs font-mono" id="previewContent">
-        <div class="text-zinc-600 italic">當 Agent 呼叫工具或修改檔案時，即時 Observation 與 Diff 將顯示於此。</div>
+      <!-- Tab 1: Preview & Observations & Monaco Diff -->
+      <div class="flex-1 flex flex-col overflow-hidden" id="previewTabWrapper">
+        <div id="monacoDiffContainer" class="hidden h-64 border-b border-zinc-800 bg-[#1e1e1e] shrink-0"></div>
+        <div class="flex-1 overflow-y-auto p-3 text-xs font-mono" id="previewContent">
+          <div class="text-zinc-600 italic">當 Agent 呼叫工具或修改檔案時，即時 Observation 與 Diff 將顯示於此。</div>
+        </div>
       </div>
 
       <!-- Tab 2: MCP Topology & Servers -->
@@ -194,6 +218,10 @@
     const selectProvider = document.getElementById('selectProvider');
     const selectModel = document.getElementById('selectModel');
     const checkAutoApprove = document.getElementById('checkAutoApprove');
+    const selectStrategy = document.getElementById('selectStrategy');
+    const inputMaxTurns = document.getElementById('inputMaxTurns');
+    const checkUseSse = document.getElementById('checkUseSse');
+    const monacoDiffContainer = document.getElementById('monacoDiffContainer');
 
     // Headers with Auth
     function getHeaders() {
@@ -310,7 +338,13 @@
       chatContainer.appendChild(card);
       chatContainer.scrollTop = chatContainer.scrollHeight;
 
-      if (req.diff) {
+      if (req.orig_text !== undefined && req.new_text !== undefined && req.orig_text !== null && req.new_text !== null) {
+        showMonacoDiff(req.orig_text, req.new_text);
+        previewContent.innerHTML = `
+          <div class="text-yellow-400 font-bold mb-1">Monaco Side-by-Side Diff: ${req.tool_name}</div>
+          <div class="text-[10px] text-zinc-400 mb-2">上方雙欄為即時 Monaco 比對器，請審查並點擊 Approve 或 Deny</div>
+        `;
+      } else if (req.diff) {
         previewContent.innerHTML = `
           <div class="text-yellow-400 font-bold mb-1">Pending Approval: ${req.tool_name}</div>
           <div class="text-[10px] text-zinc-400 mb-2">請於主對話區審查並點擊 Approve 或 Deny</div>
@@ -322,12 +356,14 @@
         if (ws) ws.send(JSON.stringify({ action: 'approve', approval_id: req.approval_id }));
         card.innerHTML = `<div class="text-emerald-400 font-medium py-1">✓ 已核准執行: ${req.tool_name}</div>`;
         card.className = 'border border-emerald-800/50 bg-emerald-950/10 p-3 rounded-xl text-xs';
+        if (monacoDiffContainer) monacoDiffContainer.classList.add('hidden');
       };
 
       document.getElementById(`btnDeny_${req.approval_id}`).onclick = () => {
         if (ws) ws.send(JSON.stringify({ action: 'deny', approval_id: req.approval_id }));
         card.innerHTML = `<div class="text-red-400 font-medium py-1">✕ 已拒絕執行: ${req.tool_name}</div>`;
         card.className = 'border border-red-800/50 bg-red-950/10 p-3 rounded-xl text-xs';
+        if (monacoDiffContainer) monacoDiffContainer.classList.add('hidden');
       };
     }
 
@@ -377,32 +413,108 @@
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 
-    function sendQuery() {
+    let activeSseController = null;
+
+    async function sendQuery() {
       const text = promptInput.value.trim();
       if (!text) return;
 
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
-        alert("WebSocket 尚未連線，請稍候重試");
-        return;
-      }
+      const strategyVal = selectStrategy.value || 'standard';
+      const maxTurnsVal = parseInt(inputMaxTurns.value) || 100;
+      const useSse = checkUseSse.checked;
 
       addMessageBubble('user', text);
       promptInput.value = '';
 
-      ws.send(JSON.stringify({
-        action: 'query',
-        prompt: text,
-        session_id: currentSessionId,
-        mode: currentMode,
-        provider: selectProvider.value || undefined,
-        model: selectModel.value || undefined,
-        auto_approve: checkAutoApprove.checked,
-      }));
+      if (useSse) {
+        // Run via Server-Sent Events (SSE)
+        btnCancel.classList.remove('hidden');
+        agentStatus.classList.remove('hidden');
+        agentStatus.innerText = '● SSE 連線與串流中...';
+
+        activeSseController = new AbortController();
+        try {
+          const res = await fetch('/api/events/sse', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+              prompt: text,
+              session_id: currentSessionId,
+              mode: currentMode,
+              provider: selectProvider.value || undefined,
+              model: selectModel.value || undefined,
+              auto_approve: checkAutoApprove.checked,
+              strategy: strategyVal,
+              max_turns: maxTurnsVal,
+            }),
+            signal: activeSseController.signal,
+          });
+
+          if (!res.ok) {
+            throw new Error(`SSE 請求失敗: HTTP ${res.status}`);
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop(); // keep remainder
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data: ')) {
+                try {
+                  const eventData = JSON.parse(trimmed.slice(6));
+                  handleAgentEvent(eventData);
+                } catch (e) {
+                  console.error("SSE parse error", e);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          if (err.name === 'AbortError') {
+            addSystemNotice("⚠️ SSE 串流已由使用者中斷。");
+          } else {
+            addSystemNotice(`❌ SSE 錯誤: ${err.message}`);
+          }
+        } finally {
+          agentStatus.classList.add('hidden');
+          btnCancel.classList.add('hidden');
+          activeSseController = null;
+        }
+      } else {
+        // Run via WebSocket
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          alert("WebSocket 尚未連線，請稍候重試");
+          return;
+        }
+
+        ws.send(JSON.stringify({
+          action: 'query',
+          prompt: text,
+          session_id: currentSessionId,
+          mode: currentMode,
+          provider: selectProvider.value || undefined,
+          model: selectModel.value || undefined,
+          auto_approve: checkAutoApprove.checked,
+          strategy: strategyVal,
+          max_turns: maxTurnsVal,
+        }));
+      }
     }
 
     // Event Listeners
     btnSend.onclick = sendQuery;
     btnCancel.onclick = () => {
+      if (activeSseController) {
+        activeSseController.abort();
+      }
       if (ws) ws.send(JSON.stringify({ action: 'cancel' }));
     };
 
@@ -793,7 +905,54 @@
       }
     }
 
+    // ------------------ Monaco Diff Editor Integration ------------------
+    let monacoDiffEditor = null;
+    let monacoLoaded = false;
+
+    function initMonacoDiff() {
+      if (typeof require === 'undefined') return;
+      require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+      require(['vs/editor/editor.main'], function () {
+        monacoLoaded = true;
+      });
+    }
+
+    function showMonacoDiff(originalText, modifiedText, language = 'python') {
+      if (!monacoDiffContainer) return;
+      monacoDiffContainer.classList.remove('hidden');
+
+      if (!monacoLoaded || typeof monaco === 'undefined') {
+        // Fallback if Monaco hasn't finished loading yet
+        monacoDiffContainer.innerHTML = `
+          <div class="p-2 text-zinc-400 text-xs">Monaco Diff 比對器初始化中...</div>
+        `;
+        setTimeout(() => showMonacoDiff(originalText, modifiedText, language), 500);
+        return;
+      }
+
+      if (!monacoDiffEditor) {
+        monacoDiffContainer.innerHTML = '';
+        monacoDiffEditor = monaco.editor.createDiffEditor(monacoDiffContainer, {
+          theme: 'vs-dark',
+          readOnly: true,
+          renderSideBySide: true,
+          automaticLayout: true,
+          fontSize: 11,
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false,
+        });
+      }
+
+      const origModel = monaco.editor.createModel(originalText, language);
+      const modModel = monaco.editor.createModel(modifiedText, language);
+      monacoDiffEditor.setModel({
+        original: origModel,
+        modified: modModel,
+      });
+    }
+
     // Startup
+    initMonacoDiff();
     loadStatus();
     loadProviders();
     loadSessions();

@@ -139,9 +139,25 @@ def test_web_agent_websocket_approval(web_test_client):
             "action": "query",
             "prompt": "hi",
             "auto_approve": False,
+            "strategy": "minimal",
+            "max_turns": 10,
         })
         first_event = ws.receive_json()
         assert "type" in first_event
         ws.send_json({"action": "cancel"})
+
+
+def test_web_sse_streaming(web_test_client):
+    res = web_test_client.post(
+        "/api/events/sse?token=secret123",
+        json={
+            "prompt": "hello",
+            "strategy": "minimal",
+            "max_turns": 5,
+        },
+    )
+    assert res.status_code == 200
+    assert "text/event-stream" in res.headers.get("content-type", "")
+
 
 

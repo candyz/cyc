@@ -281,18 +281,23 @@ cyc web --token my-secret-token --no-open
    - **左側欄**：歷史會話清單（支援檢視與一鍵切換）及工作區檔案樹瀏覽器。
    - **中央主聊天區**：支援 Markdown 渲染、程式碼高亮、免審批模式 (Auto Approve) 與隨時中斷按鈕 (Cancel)。
    - **右側抽屜**：詳細工具執行輸出與即時程式碼 Diff 預覽。
-3. **HITL 視覺化審批流程 (Human-in-the-loop)**：
+3. **HITL 視覺化審批流程與 Monaco Editor 雙欄比對**：
    - 取消勾選「免確認 (Auto Approve)」時，Agent 呼叫破壞性或檔案修改工具（如 `replace_file_content`, `write_file`, `run_command`）時會暫停執行。
-   - 主聊天區與右側抽屜即時彈出 Unified Diff 比對與參數卡片，等待使用者在 Web 端點擊 `[Approve]` 核准或 `[Deny]` 拒絕。
-4. **內嵌式 Web Terminal (xterm.js + PTY Bridge)**：
+   - 整合專業 **Monaco Editor 雙欄行號對齊差異編輯器 (Side-by-Side Diff)**，清楚高亮新增與刪除內容，等待使用者點擊 `[Approve]` 核准或 `[Deny]` 拒絕。
+4. **Agent 循環策略與輪數動態切換**：
+   - 輸入列支援隨時切換 Loop 策略（`standard`, `plan`, `minimal`）與設定最大執行輪數上限（`Max Turns`）。
+5. **雙串流通道支援 (WebSocket & SSE)**：
+   - 預設採用低延遲雙向 WebSocket (`/ws/agent`)。
+   - 亦支援切換為標準 HTTP **Server-Sent Events (`/api/events/sse`)** 串流通道，穿越企業代理或防火牆更穩定。
+6. **內嵌式 Web Terminal (xterm.js + PTY Bridge)**：
    - 點擊頂部 `💻 Terminal` 按鈕即可自底部拉出擬真 Web 終端。
    - 透過 `/ws/terminal` 橋接系統原生 PTY（Bash / Zsh），直接於瀏覽器內執行 `git status`, `pytest` 等 Shell 指令。
-5. **Token 消耗儀表板與一鍵上下文壓縮 (`⚡ Compact`)**：
+7. **Token 消耗儀表板與一鍵上下文壓縮 (`⚡ Compact`)**：
    - 頂部導覽列即時顯示目前 Session 的 Token 佔比進度條（色彩隨水位自綠變黃轉紅）。
    - 支援點擊 `⚡ Compact` 按鈕，直接呼叫後端 `/api/sessions/{id}/compact` 對過長歷史進行摘要壓縮並精簡工具輸出。
-6. **視覺化 MCP 伺服器狀態與連線拓撲 (`🔌 MCP Servers`)**：
+8. **視覺化 MCP 伺服器狀態與連線拓撲 (`🔌 MCP Servers`)**：
    - 右側抽屜提供專屬 MCP 分頁，即時列出所有配置之 MCP Server 名稱、可執行檔路徑、工作目錄與健康連線狀態（`ready` / `executable_not_found`）。
-7. **安全防護與 SSL/TLS**：
+9. **安全防護與 SSL/TLS**：
    - 內建 Token 認證中介層（URL Token 與 HTTP Bearer Header 雙重支援）。
    - 工作區路徑檢查，嚴格防止目錄遍歷 (Path Traversal)。
    - 支援於 `config.yaml` 中配置 `ssl_cert` 與 `ssl_key` 啟用 HTTPS / WSS 加密傳輸。

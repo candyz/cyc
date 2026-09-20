@@ -22,7 +22,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -51,6 +51,8 @@ class QueryRequest(BaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     auto_approve: Optional[bool] = None
+    strategy: Optional[str] = "standard"  # "standard", "plan", "minimal"
+    max_turns: Optional[int] = None
 
 
 class SessionCreateRequest(BaseModel):
@@ -277,6 +279,80 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
             })
         return {"type": "directory", "path": str(target_path.relative_to(ws_path)) if target_path != ws_path else "", "items": items}
 
+    # ------------------ Server-Sent Events (SSE) Channel ------------------
+
+    @app.post("/api/events/sse")
+    async def sse_agent_endpoint(req: QueryRequest, token: Optional[str] = Query(None), authorization: Optional[str] = Header(None)):
+        if not verify_token(token, authorization):
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        sess_id = req.session_id
+        prov_name = req.provider or cfg.default_provider
+        mod_name = req.model or cfg.get_provider(prov_name).default_model or cfg.default_model
+        mode = req.mode or cfg.agent.default_mode or "agent"
+        auto_approve = req.auto_approve if req.auto_approve is not None else True
+        loop_strategy = req.strategy or "standard"
+        loop_max_turns = int(req.max_turns or cfg.agent.max_turns)
+
+        session = SessionManager.find_session(sess_id) if sess_id else None
+        if not session:
+            session = SessionManager(
+                session_id=sess_id,
+                provider=prov_name,
+                model=mod_name,
+                mode=mode,
+            )
+
+        provider_cfg = cfg.get_provider(prov_name)
+        provider_inst = create_provider(provider_cfg)
+        searxng_url = cfg.agent.searxng_url
+        tool_registry = ToolRegistry(get_default_tools(searxng_url=searxng_url))
+
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def sse_event_callback(event: Dict[str, Any]):
+            await queue.put(event)
+
+        perm_mode = PermissionMode.AUTO if auto_approve else PermissionMode.READ_ONLY
+        permission_mgr = PermissionManager(mode=perm_mode)
+
+        agent_loop = AgentLoop(
+            provider=provider_inst,
+            model=mod_name,
+            session=session,
+            tool_registry=tool_registry,
+            permission_manager=permission_mgr,
+            max_turns=loop_max_turns,
+            strategy=loop_strategy,
+            event_callback=sse_event_callback,
+        )
+
+        async def run_in_background():
+            try:
+                res = await agent_loop.run_turn(req.prompt)
+                await queue.put({
+                    "type": "turn_complete",
+                    "session_id": session.session_id,
+                    "result": res,
+                })
+            except asyncio.CancelledError:
+                await queue.put({"type": "cancelled", "note": "Execution cancelled"})
+            except Exception as e:
+                await queue.put({"type": "error", "error": str(e)})
+            finally:
+                await queue.put(None)  # Sentinel to end stream
+
+        asyncio.create_task(run_in_background())
+
+        async def event_generator():
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+
     # ------------------ WebSocket Agent Engine ------------------
 
     @app.websocket("/ws/agent")
@@ -316,6 +392,8 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
                     auto_approve = payload.get("auto_approve")
                     if auto_approve is None:
                         auto_approve = cfg.agent.auto_approve
+                    loop_strategy = payload.get("strategy") or "standard"
+                    loop_max_turns = int(payload.get("max_turns") or cfg.agent.max_turns)
 
                     # Load or create session
                     session = SessionManager.find_session(sess_id) if sess_id else None
@@ -339,22 +417,23 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
                         pending_approvals[approval_id] = fut
 
                         # Calculate diff preview if mutating files
-                        diff_text = None
+                        orig_str = None
+                        new_str = None
                         if tool.name == "replace_file_content":
                             fp = args.get("path", "")
                             target = args.get("target", "")
                             repl = args.get("replacement", "")
                             orig_file = Path(fp).expanduser()
                             if orig_file.exists() and orig_file.is_file():
-                                orig_text = orig_file.read_text(encoding="utf-8", errors="replace")
-                                new_text = orig_text.replace(target, repl, 1)
-                                diff_text = generate_unified_diff(fp, orig_text, new_text)
+                                orig_str = orig_file.read_text(encoding="utf-8", errors="replace")
+                                new_str = orig_str.replace(target, repl, 1)
+                                diff_text = generate_unified_diff(fp, orig_str, new_str)
                         elif tool.name == "write_file":
                             fp = args.get("path", "")
-                            content = args.get("content", "")
+                            new_str = args.get("content", "")
                             orig_file = Path(fp).expanduser()
-                            orig_text = orig_file.read_text(encoding="utf-8", errors="replace") if orig_file.exists() else ""
-                            diff_text = generate_unified_diff(fp, orig_text, content)
+                            orig_str = orig_file.read_text(encoding="utf-8", errors="replace") if orig_file.exists() else ""
+                            diff_text = generate_unified_diff(fp, orig_str, new_str)
 
                         await websocket.send_json({
                             "type": "approval_request",
@@ -362,6 +441,8 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
                             "tool_name": tool.name,
                             "arguments": args,
                             "diff": diff_text,
+                            "orig_text": orig_str,
+                            "new_text": new_str,
                             "question": prompt_text or f"Allow '{tool.name}' to execute?",
                         })
 
@@ -389,8 +470,8 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
                         session=session,
                         tool_registry=tool_registry,
                         permission_manager=permission_mgr,
-                        max_turns=cfg.agent.max_turns,
-                        strategy="standard",
+                        max_turns=loop_max_turns,
+                        strategy=loop_strategy,
                         event_callback=ws_event_callback,
                     )
 
