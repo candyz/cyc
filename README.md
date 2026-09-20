@@ -111,4 +111,7 @@ cyc
 - 📖 **[使用手冊 (User Manual)](docs/USER_MANUAL.md)**：完整說明對話模式、自主編程代理、PTC 腳本呼叫、Loop 策略、技能庫與 Slash 指令。
 - 🚀 **[部署與配置指南 (Deployment Guide)](docs/DEPLOYMENT_GUIDE.md)**：包含全域安裝、設定檔配置、Provider 認證、MCP 工具擴充與 Shell 自動補全設置。
 - 📋 **[架構與規劃書](docs/CLI_CHAT_SPEC_AND_PLAN.md)**：設計背景、技術架構與規格演進歷程。
+- 🤖 **[Coding Agent 規格書](docs/CODING_AGENT_SPEC_AND_PLAN.md)**：自主編程代理、安全權限審批與架構演進規劃。
+- 💬 **[Telegram 與通訊軟體串接計劃](docs/TELEGRAM_INTEGRATION_SPEC_AND_PLAN.md)**：跨裝置行動端遠端控制、非同步任務推播與 HITL 按鈕審批。
+- 🌐 **[Web 遠端操控介面實作計劃](docs/WEB_INTERFACE_SPEC_AND_PLAN.md)**：現代化 Web SPA、多欄位即時 Diff 預覽與嵌入式 Web Terminal。
 
