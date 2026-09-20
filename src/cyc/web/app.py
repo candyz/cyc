@@ -600,4 +600,11 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
                 return FileResponse(index_file)
             return JSONResponse({"message": "cyc Web API running. index.html not found."})
 
+        @app.get("/favicon.ico")
+        async def serve_favicon():
+            favicon_file = static_dir / "favicon.ico"
+            if favicon_file.exists():
+                return FileResponse(favicon_file, media_type="image/x-icon")
+            return Response(status_code=404)
+
     return app

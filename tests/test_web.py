@@ -20,6 +20,18 @@ def test_web_auth_failure(web_test_client):
     assert res.status_code == 401
 
 
+def test_web_favicon(web_test_client):
+    res = web_test_client.get("/favicon.ico")
+    assert res.status_code == 200
+    assert "image/x-icon" in res.headers.get("content-type", "")
+    assert len(res.content) > 0
+
+    res_static = web_test_client.get("/static/favicon.png")
+    assert res_static.status_code == 200
+    assert "image/png" in res_static.headers.get("content-type", "")
+
+
+
 def test_web_auth_success_with_query_token(web_test_client):
     res = web_test_client.get("/api/status?token=secret123")
     assert res.status_code == 200
