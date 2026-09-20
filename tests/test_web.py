@@ -91,3 +91,33 @@ def test_web_index_html_serving(web_test_client):
     res = web_test_client.get("/")
     assert res.status_code == 200
     assert "cyc" in res.text
+    assert "Web Terminal" in res.text
+
+
+def test_web_terminal_websocket(web_test_client):
+    with web_test_client.websocket_connect("/ws/terminal?token=secret123") as ws:
+        ws.send_text("echo test_term\n")
+        # Receive output from PTY
+        output = ""
+        for _ in range(5):
+            chunk = ws.receive_text()
+            output += chunk
+            if "test_term" in output:
+                break
+        assert "test_term" in output
+
+
+def test_web_agent_websocket_approval(web_test_client):
+    with web_test_client.websocket_connect("/ws/agent?token=secret123") as ws:
+        # Send query with auto_approve = False
+        ws.send_json({
+            "action": "query",
+            "prompt": "hi",
+            "auto_approve": False,
+        })
+        # Verify websocket communicates
+        first_event = ws.receive_json()
+        assert "type" in first_event
+        # Send cancel
+        ws.send_json({"action": "cancel"})
+

@@ -1,7 +1,7 @@
 import asyncio
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Dict, Optional, Set
+from typing import Any, Callable, Dict, Optional, Set
 from rich.console import Console
 from rich.panel import Panel
 from cyc.agent.tools.base import Tool
@@ -15,9 +15,14 @@ class PermissionMode(str, Enum):
     READ_ONLY = "read_only"
 
 class PermissionManager:
-    def __init__(self, mode: PermissionMode = PermissionMode.INTERACTIVE):
+    def __init__(
+        self,
+        mode: PermissionMode = PermissionMode.INTERACTIVE,
+        confirmation_handler: Optional[Callable[[Tool, Dict, Optional[str]], Any]] = None,
+    ):
         self.mode = mode
         self.always_allowed_tools: Set[str] = set()
+        self.confirmation_handler = confirmation_handler
 
     async def check_permission(self, tool: Tool, args: Dict, prompt_text: Optional[str] = None) -> bool:
         # Read-only tools are always safe to execute
@@ -65,7 +70,18 @@ class PermissionManager:
             syntax = Syntax(code, lang, theme="monokai", line_numbers=True)
             console.print(Panel(syntax, title=f"Programmatic Tool Script (PTC): {lang}", border_style="yellow"))
 
-        # Prompt user for confirmation
+        # If a custom confirmation handler is registered (e.g. Web HITL or GUI modal)
+        if self.confirmation_handler:
+            try:
+                if asyncio.iscoroutinefunction(self.confirmation_handler):
+                    return await self.confirmation_handler(tool, args, prompt_text)
+                else:
+                    return self.confirmation_handler(tool, args, prompt_text)
+            except Exception as e:
+                console.print(f"[bold red]Confirmation handler error:[/bold red] {e}")
+                return False
+
+        # Prompt user for confirmation in CLI
         question = prompt_text or f"Allow '{tool.name}' to execute? [y]es / [n]o / [a]lways for this session: "
         try:
             loop = asyncio.get_running_loop()

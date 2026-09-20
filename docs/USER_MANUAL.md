@@ -281,8 +281,15 @@ cyc web --token my-secret-token --no-open
    - **左側欄**：歷史會話清單（支援檢視與一鍵切換）及工作區檔案樹瀏覽器。
    - **中央主聊天區**：支援 Markdown 渲染、程式碼高亮、免審批模式 (Auto Approve) 與隨時中斷按鈕 (Cancel)。
    - **右側抽屜**：詳細工具執行輸出與即時程式碼 Diff 預覽。
-3. **安全防護**：
+3. **HITL 視覺化審批流程 (Human-in-the-loop)**：
+   - 取消勾選「免確認 (Auto Approve)」時，Agent 呼叫破壞性或檔案修改工具（如 `replace_file_content`, `write_file`, `run_command`）時會暫停執行。
+   - 主聊天區與右側抽屜即時彈出 Unified Diff 比對與參數卡片，等待使用者在 Web 端點擊 `[Approve]` 核准或 `[Deny]` 拒絕。
+4. **內嵌式 Web Terminal (xterm.js + PTY Bridge)**：
+   - 點擊頂部 `💻 Terminal` 按鈕即可自底部拉出擬真 Web 終端。
+   - 透過 `/ws/terminal` 橋接系統原生 PTY（Bash / Zsh），直接於瀏覽器內執行 `git status`, `pytest` 等 Shell 指令。
+5. **安全防護與 SSL/TLS**：
    - 內建 Token 認證中介層（URL Token 與 HTTP Bearer Header 雙重支援）。
    - 工作區路徑檢查，嚴格防止目錄遍歷 (Path Traversal)。
-   - 支援可配置 CORS 網域。
+   - 支援於 `config.yaml` 中配置 `ssl_cert` 與 `ssl_key` 啟用 HTTPS / WSS 加密傳輸。
+
 

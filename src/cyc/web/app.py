@@ -1,7 +1,12 @@
 import asyncio
+import fcntl
 import json
 import os
+import pty
 import secrets
+import struct
+import subprocess
+import termios
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -31,6 +36,7 @@ from cyc.agent import (
     WorkspaceTrustManager,
     get_default_tools,
 )
+from cyc.agent.diff import generate_unified_diff
 from cyc.config import Config, load_config
 from cyc.providers import create_provider
 from cyc.session import SessionManager
@@ -250,6 +256,7 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
         await websocket.accept()
 
         current_task: Optional[asyncio.Task] = None
+        pending_approvals: Dict[str, asyncio.Future] = {}
 
         try:
             while True:
@@ -293,8 +300,49 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
                     searxng_url = cfg.agent.searxng_url
                     tool_registry = ToolRegistry(get_default_tools(searxng_url=searxng_url))
 
+                    async def web_confirmation_handler(tool, args, prompt_text):
+                        approval_id = secrets.token_hex(8)
+                        fut = asyncio.get_running_loop().create_future()
+                        pending_approvals[approval_id] = fut
+
+                        # Calculate diff preview if mutating files
+                        diff_text = None
+                        if tool.name == "replace_file_content":
+                            fp = args.get("path", "")
+                            target = args.get("target", "")
+                            repl = args.get("replacement", "")
+                            orig_file = Path(fp).expanduser()
+                            if orig_file.exists() and orig_file.is_file():
+                                orig_text = orig_file.read_text(encoding="utf-8", errors="replace")
+                                new_text = orig_text.replace(target, repl, 1)
+                                diff_text = generate_unified_diff(fp, orig_text, new_text)
+                        elif tool.name == "write_file":
+                            fp = args.get("path", "")
+                            content = args.get("content", "")
+                            orig_file = Path(fp).expanduser()
+                            orig_text = orig_file.read_text(encoding="utf-8", errors="replace") if orig_file.exists() else ""
+                            diff_text = generate_unified_diff(fp, orig_text, content)
+
+                        await websocket.send_json({
+                            "type": "approval_request",
+                            "approval_id": approval_id,
+                            "tool_name": tool.name,
+                            "arguments": args,
+                            "diff": diff_text,
+                            "question": prompt_text or f"Allow '{tool.name}' to execute?",
+                        })
+
+                        try:
+                            approved = await fut
+                            return bool(approved)
+                        finally:
+                            pending_approvals.pop(approval_id, None)
+
                     perm_mode = PermissionMode.AUTO if auto_approve else PermissionMode.INTERACTIVE
-                    permission_mgr = PermissionManager(perm_mode)
+                    permission_mgr = PermissionManager(
+                        mode=perm_mode,
+                        confirmation_handler=web_confirmation_handler if not auto_approve else None,
+                    )
 
                     async def ws_event_callback(event: Dict[str, Any]):
                         try:
@@ -328,9 +376,103 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
 
                     current_task = asyncio.create_task(run_query())
 
+                elif action in ("approve", "deny"):
+                    approval_id = payload.get("approval_id")
+                    if approval_id and approval_id in pending_approvals:
+                        fut = pending_approvals[approval_id]
+                        if not fut.done():
+                            fut.set_result(action == "approve")
+
         except WebSocketDisconnect:
             if current_task and not current_task.done():
                 current_task.cancel()
+
+    # ------------------ WebSocket Web Terminal (PTY Bridge) ------------------
+
+    @app.websocket("/ws/terminal")
+    async def websocket_terminal_endpoint(websocket: WebSocket):
+        token = websocket.query_params.get("token")
+        if not verify_token(token):
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
+        if not cfg.web.enable_terminal:
+            await websocket.close(code=status.WS_1003_UNSUPPORTED_DATA, reason="Terminal disabled in config")
+            return
+
+        await websocket.accept()
+
+        master_fd, slave_fd = pty.openpty()
+        shell = os.environ.get("SHELL", "/bin/bash")
+        proc = subprocess.Popen(
+            [shell],
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            cwd=str(ws_path),
+            env=os.environ.copy(),
+            close_fds=True,
+            preexec_fn=os.setsid,
+        )
+        os.close(slave_fd)
+
+        # Set master_fd non-blocking
+        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+        loop = asyncio.get_running_loop()
+        stop_event = asyncio.Event()
+
+        # Task 1: Read from PTY master_fd -> send to WebSocket
+        async def pty_reader():
+            while not stop_event.is_set():
+                try:
+                    await asyncio.sleep(0.01)
+                    data = os.read(master_fd, 4096)
+                    if data:
+                        await websocket.send_text(data.decode("utf-8", errors="replace"))
+                except BlockingIOError:
+                    await asyncio.sleep(0.02)
+                except Exception:
+                    break
+
+        reader_task = asyncio.create_task(pty_reader())
+
+        # Task 2: Receive from WebSocket -> write to PTY master_fd
+        try:
+            while not stop_event.is_set():
+                msg_text = await websocket.receive_text()
+                try:
+                    msg_obj = json.loads(msg_text)
+                    msg_type = msg_obj.get("type")
+                    if msg_type == "input":
+                        data_to_write = msg_obj.get("data", "").encode("utf-8")
+                        os.write(master_fd, data_to_write)
+                    elif msg_type == "resize":
+                        cols = int(msg_obj.get("cols", 80))
+                        rows = int(msg_obj.get("rows", 24))
+                        winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+                except json.JSONDecodeError:
+                    # Raw input fallback
+                    os.write(master_fd, msg_text.encode("utf-8"))
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        finally:
+            stop_event.set()
+            reader_task.cancel()
+            try:
+                os.close(master_fd)
+            except Exception:
+                pass
+            try:
+                proc.terminate()
+                proc.wait(timeout=1.0)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
 
     # Mount static assets if static dir exists
     static_dir = Path(__file__).parent / "static"

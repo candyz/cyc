@@ -8,6 +8,9 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .prose pre { background: #1e1e1e; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
@@ -25,7 +28,7 @@
   <header class="bg-zinc-900 border-b border-zinc-800 px-4 py-2.5 flex items-center justify-between shrink-0">
     <div class="flex items-center space-x-3">
       <span class="font-extrabold text-xl tracking-wider text-emerald-400">cyc</span>
-      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v0.14.0</span>
+      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v0.15.0</span>
       <div class="hidden sm:flex items-center space-x-2 text-xs text-zinc-400 border-l border-zinc-700 pl-3">
         <span>Workspace:</span>
         <span class="text-zinc-200 font-mono" id="wsName">loading...</span>
@@ -46,6 +49,10 @@
       <select id="selectModel" class="bg-zinc-800 border border-zinc-700 text-xs rounded-md px-2 py-1.5 text-zinc-200 focus:outline-none focus:border-emerald-500 max-w-[180px]">
         <option value="">Model</option>
       </select>
+
+      <button id="btnToggleTerminal" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-1.5 rounded-md flex items-center space-x-1" title="開啟/收合終端視窗">
+        <span>💻 Terminal</span>
+      </button>
 
       <button id="btnNewChat" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-1.5 rounded-md flex items-center space-x-1">
         <span>+ New</span>
@@ -106,6 +113,19 @@
             </div>
           </div>
         </div>
+      <!-- Terminal Bottom Drawer (Collapsible) -->
+      <div id="terminalDrawer" class="hidden h-64 border-t border-zinc-800 bg-black flex flex-col shrink-0">
+        <div class="px-3 py-1.5 bg-zinc-900 border-b border-zinc-800 flex justify-between items-center text-xs text-zinc-400">
+          <div class="flex items-center space-x-2">
+            <span class="font-mono text-emerald-400 font-bold">💻 Web Terminal</span>
+            <span class="text-[10px] text-zinc-500">(PTY Shell)</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button id="btnClearTerminal" class="hover:text-zinc-200">Clear</button>
+            <button id="btnCloseTerminal" class="hover:text-zinc-200 font-bold">✕</button>
+          </div>
+        </div>
+        <div id="xtermContainer" class="flex-1 p-2 overflow-hidden"></div>
       </div>
     </main>
 
@@ -183,6 +203,10 @@
         agentStatus.classList.remove('hidden');
         agentStatus.innerText = `● 思考與規劃中 (回合 ${event.turn}/${event.max_turns})...`;
         btnCancel.classList.remove('hidden');
+      } else if (event.type === 'approval_request') {
+        agentStatus.classList.remove('hidden');
+        agentStatus.innerText = `⏳ 等待審批確認...`;
+        addApprovalCard(event);
       } else if (event.type === 'tool_call') {
         addToolCallCard(event.name, event.arguments);
       } else if (event.type === 'tool_result') {
@@ -227,6 +251,47 @@
 
     function addAssistantMessage(content) {
       addMessageBubble('assistant', content);
+    }
+
+    function addApprovalCard(req) {
+      const card = document.createElement('div');
+      card.id = `approval_${req.approval_id}`;
+      card.className = 'border-2 border-yellow-500/80 bg-yellow-950/20 p-4 rounded-xl text-xs space-y-3';
+      card.innerHTML = `
+        <div class="flex items-center justify-between text-yellow-400 font-bold text-sm">
+          <span>⚠️ 待審批操作: ${req.tool_name}</span>
+          <span class="text-[11px] bg-yellow-500/20 px-2 py-0.5 rounded border border-yellow-500/40">Action Required</span>
+        </div>
+        <div class="text-zinc-300 font-medium">${req.question}</div>
+        <pre class="bg-black/60 p-2.5 rounded text-zinc-300 overflow-x-auto font-mono text-[11px] max-h-48">${JSON.stringify(req.arguments, null, 2)}</pre>
+        ${req.diff ? `<div class="text-zinc-400 text-[11px] font-semibold">變更對比 (Unified Diff):</div><pre class="bg-zinc-900 border border-zinc-700 p-2.5 rounded text-zinc-200 overflow-x-auto font-mono text-[11px] max-h-56 whitespace-pre leading-relaxed">${req.diff}</pre>` : ''}
+        <div class="flex items-center justify-end space-x-2 pt-2 border-t border-zinc-800">
+          <button id="btnDeny_${req.approval_id}" class="px-4 py-1.5 bg-red-700 hover:bg-red-600 text-white rounded font-medium transition">拒絕 (Deny)</button>
+          <button id="btnApprove_${req.approval_id}" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium transition">核准執行 (Approve)</button>
+        </div>
+      `;
+      chatContainer.appendChild(card);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      if (req.diff) {
+        previewContent.innerHTML = `
+          <div class="text-yellow-400 font-bold mb-1">Pending Approval: ${req.tool_name}</div>
+          <div class="text-[10px] text-zinc-400 mb-2">請於主對話區審查並點擊 Approve 或 Deny</div>
+          <pre class="p-2 bg-black/60 rounded text-zinc-200 text-[11px] overflow-x-auto whitespace-pre font-mono">${req.diff}</pre>
+        `;
+      }
+
+      document.getElementById(`btnApprove_${req.approval_id}`).onclick = () => {
+        if (ws) ws.send(JSON.stringify({ action: 'approve', approval_id: req.approval_id }));
+        card.innerHTML = `<div class="text-emerald-400 font-medium py-1">✓ 已核准執行: ${req.tool_name}</div>`;
+        card.className = 'border border-emerald-800/50 bg-emerald-950/10 p-3 rounded-xl text-xs';
+      };
+
+      document.getElementById(`btnDeny_${req.approval_id}`).onclick = () => {
+        if (ws) ws.send(JSON.stringify({ action: 'deny', approval_id: req.approval_id }));
+        card.innerHTML = `<div class="text-red-400 font-medium py-1">✕ 已拒絕執行: ${req.tool_name}</div>`;
+        card.className = 'border border-red-800/50 bg-red-950/10 p-3 rounded-xl text-xs';
+      };
     }
 
     function addToolCallCard(name, args) {
@@ -481,6 +546,103 @@
 
     document.getElementById('btnRefreshSessions').onclick = loadSessions;
     document.getElementById('btnRefreshFiles').onclick = () => loadFiles('');
+
+    // ------------------ Web Terminal (xterm.js) ------------------
+    let term = null;
+    let termFitAddon = null;
+    let termWs = null;
+    const terminalDrawer = document.getElementById('terminalDrawer');
+    const btnToggleTerminal = document.getElementById('btnToggleTerminal');
+    const btnCloseTerminal = document.getElementById('btnCloseTerminal');
+    const btnClearTerminal = document.getElementById('btnClearTerminal');
+
+    function initTerminal() {
+      if (term) return;
+
+      term = new Terminal({
+        cursorBlink: true,
+        fontSize: 12,
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        theme: {
+          background: '#09090b',
+          foreground: '#f4f4f5',
+          cursor: '#10b981',
+          selectionBackground: '#27272a',
+        }
+      });
+
+      termFitAddon = new FitAddon.FitAddon();
+      term.loadAddon(termFitAddon);
+      term.open(document.getElementById('xtermContainer'));
+      termFitAddon.fit();
+
+      // Connect Terminal WebSocket
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/terminal?token=${encodeURIComponent(authToken)}`;
+      termWs = new WebSocket(wsUrl);
+
+      termWs.onopen = () => {
+        term.writeln('\x1b[32m✔ Connected to cyc Terminal session.\x1b[0m\r\n');
+        sendTerminalResize();
+      };
+
+      termWs.onmessage = (e) => {
+        term.write(e.data);
+      };
+
+      termWs.onclose = () => {
+        term.writeln('\r\n\x1b[31m✖ Terminal session closed.\x1b[0m\r\n');
+      };
+
+      term.onData(data => {
+        if (termWs && termWs.readyState === WebSocket.OPEN) {
+          termWs.send(JSON.stringify({ type: 'input', data: data }));
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (!terminalDrawer.classList.contains('hidden') && termFitAddon) {
+          termFitAddon.fit();
+          sendTerminalResize();
+        }
+      });
+    }
+
+    function sendTerminalResize() {
+      if (term && termWs && termWs.readyState === WebSocket.OPEN) {
+        termWs.send(JSON.stringify({
+          type: 'resize',
+          cols: term.cols,
+          rows: term.rows,
+        }));
+      }
+    }
+
+    btnToggleTerminal.onclick = () => {
+      const isHidden = terminalDrawer.classList.contains('hidden');
+      if (isHidden) {
+        terminalDrawer.classList.remove('hidden');
+        btnToggleTerminal.classList.add('bg-zinc-700', 'text-emerald-400');
+        initTerminal();
+        setTimeout(() => {
+          if (termFitAddon) termFitAddon.fit();
+          sendTerminalResize();
+          if (term) term.focus();
+        }, 50);
+      } else {
+        terminalDrawer.classList.add('hidden');
+        btnToggleTerminal.classList.remove('bg-zinc-700', 'text-emerald-400');
+      }
+    };
+
+    btnCloseTerminal.onclick = () => {
+      terminalDrawer.classList.add('hidden');
+      btnToggleTerminal.classList.remove('bg-zinc-700', 'text-emerald-400');
+    };
+
+    btnClearTerminal.onclick = () => {
+      if (term) term.clear();
+    };
 
     // Startup
     loadStatus();

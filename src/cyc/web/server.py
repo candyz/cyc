@@ -36,15 +36,18 @@ def run_web_server(
 
     app = create_app(config=cfg, auth_token=token, workspace_path=ws_path)
 
+    use_ssl = bool(cfg.web.ssl_cert and cfg.web.ssl_key)
+    scheme = "https" if use_ssl else "http"
     display_host = "localhost" if server_host in ("0.0.0.0", "127.0.0.1") else server_host
-    app_url = f"http://{display_host}:{server_port}/?token={token}"
+    app_url = f"{scheme}://{display_host}:{server_port}/?token={token}"
 
     panel_text = (
         f"[bold green]cyc Web Interface v{__version__}[/bold green]\n\n"
         f"• Workspace: [cyan]{ws_path.resolve()}[/cyan]\n"
-        f"• Server:    [bold]http://{server_host}:{server_port}[/bold]\n"
+        f"• Server:    [bold]{scheme}://{server_host}:{server_port}[/bold]\n"
         f"• URL:       [bold underline cyan]{app_url}[/bold underline cyan]\n"
-        f"• Auth Token: [yellow]{token}[/yellow]\n\n"
+        f"• Auth Token: [yellow]{token}[/yellow]\n"
+        f"• SSL/TLS:   [{'green' if use_ssl else 'dim'}]{'Enabled' if use_ssl else 'Disabled'}[/{'green' if use_ssl else 'dim'}]\n\n"
         "[dim]Press Ctrl+C to stop the Web server.[/dim]"
     )
     console.print(Panel(panel_text, title="🌐 Cyc Web Service Running", border_style="green", expand=False))
@@ -55,9 +58,13 @@ def run_web_server(
         except Exception:
             pass
 
-    uvicorn.run(
-        app,
-        host=server_host,
-        port=server_port,
-        log_level="info",
-    )
+    uvicorn_kwargs = {
+        "host": server_host,
+        "port": server_port,
+        "log_level": "info",
+    }
+    if use_ssl:
+        uvicorn_kwargs["ssl_certfile"] = cfg.web.ssl_cert
+        uvicorn_kwargs["ssl_keyfile"] = cfg.web.ssl_key
+
+    uvicorn.run(app, **uvicorn_kwargs)
