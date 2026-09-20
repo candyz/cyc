@@ -11,6 +11,8 @@ from cyc.providers.base import AgentTurnResponse, BaseProvider
 from cyc.providers.gemini import GeminiProvider
 from cyc.session import SessionManager
 
+from typing import Any, Callable, Dict, List, Optional
+
 console = Console()
 
 class AgentLoop:
@@ -24,6 +26,7 @@ class AgentLoop:
         max_turns: int = 100,
         ui: Optional[Any] = None,
         strategy: str = "standard",
+        event_callback: Optional[Callable[[Dict[str, Any]], Any]] = None,
     ):
         self.provider = provider
         self.model = model
@@ -33,6 +36,19 @@ class AgentLoop:
         self.max_turns = max_turns
         self.ui = ui
         self.strategy = strategy.lower()  # "standard", "plan", "minimal"
+        self.event_callback = event_callback
+
+    async def _emit(self, event_type: str, data: Optional[Dict[str, Any]] = None):
+        """Emit an event to the registered event_callback if any."""
+        if self.event_callback:
+            payload = {"type": event_type, **(data or {})}
+            try:
+                if asyncio.iscoroutinefunction(self.event_callback):
+                    await self.event_callback(payload)
+                else:
+                    self.event_callback(payload)
+            except Exception:
+                pass
 
     def _render_tool_call_card(self, tool_name: str, args: Dict[str, Any]):
         args_formatted = json.dumps(args, ensure_ascii=False, indent=2)
@@ -85,6 +101,7 @@ class AgentLoop:
                     tools = self.tool_registry.to_openai_tools()
 
                 # Query model with tool definitions
+                await self._emit("thinking", {"turn": turn_count, "max_turns": effective_max_turns})
                 with console.status(f"[dim cyan]Agent thinking (turn {turn_count}/{effective_max_turns})...[/dim cyan]", spinner="dots"):
                     response: AgentTurnResponse = await self.provider.chat_with_tools(
                         messages=self.session.get_messages(),
@@ -113,6 +130,7 @@ class AgentLoop:
                     })
 
                     if response.content:
+                        await self._emit("message", {"role": "assistant", "content": response.content})
                         if self.ui and hasattr(self.ui, "render_formatted_response"):
                             self.ui.render_formatted_response(response.content)
                         else:
@@ -120,6 +138,11 @@ class AgentLoop:
 
                     for tc in response.tool_calls:
                         self._render_tool_call_card(tc.name, tc.arguments)
+                        await self._emit("tool_call", {
+                            "id": tc.id,
+                            "name": tc.name,
+                            "arguments": tc.arguments,
+                        })
 
                         try:
                             tool = self.tool_registry.get(tc.name)
@@ -148,6 +171,11 @@ class AgentLoop:
                             name=tc.name,
                             content=observation,
                         )
+                        await self._emit("tool_result", {
+                            "id": tc.id,
+                            "name": tc.name,
+                            "observation": observation,
+                        })
 
                     # Loop continues with tool observations now in context
                     continue
@@ -155,6 +183,7 @@ class AgentLoop:
                 # Model did not call any tools -> final answer reached
                 final_content = response.content or ""
                 if final_content:
+                    await self._emit("message", {"role": "assistant", "content": final_content})
                     if self.ui and hasattr(self.ui, "render_formatted_response"):
                         self.ui.render_formatted_response(final_content)
                     else:
@@ -165,11 +194,16 @@ class AgentLoop:
             if turn_count >= self.max_turns:
                 console.print(f"[bold yellow]Warning: Reached maximum agent loop limit ({self.max_turns} turns).[/bold yellow]")
 
+            await self._emit("done", {"final_content": final_content})
             return final_content
 
         except (asyncio.CancelledError, KeyboardInterrupt):
             # Gracefully handle Ctrl+C or async cancellation:
             # 1. Sanitize any dangling tool calls so context stays valid
             self.session.sanitize_cancelled_state(cancellation_note="Interrupted by user (Ctrl+C)")
+            await self._emit("cancelled", {"note": "Interrupted by user"})
             console.print("\n[yellow]⚠️  Agent execution interrupted by user (Ctrl+C). Session state preserved safely.[/yellow]\n")
             return "[Interrupted by user]"
+        except Exception as e:
+            await self._emit("error", {"error": str(e)})
+            raise

@@ -902,6 +902,11 @@ def parse_args():
     parser.add_argument("--trust", action="store_true", default=None, help="Explicitly trust current workspace without prompting")
     parser.add_argument("--no-trust", action="store_true", default=None, help="Explicitly restrict current workspace (force Read-Only mode)")
     parser.add_argument("--completion", nargs="?", const="bash", choices=["bash", "zsh"], help="Generate shell tab-completion script (bash or zsh)")
+    parser.add_argument("--web", action="store_true", help="Launch the cyc Web interface server")
+    parser.add_argument("--port", type=int, default=None, help="Port for the Web interface (default: 8888)")
+    parser.add_argument("--host", type=str, default=None, help="Host address to bind for Web interface (default: 127.0.0.1)")
+    parser.add_argument("--token", type=str, default=None, help="Authentication token for Web interface")
+    parser.add_argument("--no-open", action="store_true", help="Do not automatically open the browser when starting Web interface")
     return parser.parse_args()
 
 async def async_main():
@@ -947,6 +952,20 @@ async def async_main():
             return
 
     config = load_config(config_path)
+
+    # Handle 'cyc web' or 'cyc --web'
+    is_web_cmd = args.web or (len(args.prompt) == 1 and args.prompt[0].lower() == "web")
+    if is_web_cmd:
+        from cyc.web.server import run_web_server
+        run_web_server(
+            config=config,
+            host=args.host,
+            port=args.port,
+            auth_token=args.token,
+            open_browser=not args.no_open,
+            workspace_path=Path.cwd(),
+        )
+        return
 
     # Handle '--resume'
     resumed_session: Optional[SessionManager] = None

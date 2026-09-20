@@ -1,10 +1,11 @@
 [project]
 name = "cyc"
-version = "0.13.0"
+version = "0.14.0"
 description = "CLI chat and autonomous coding agent for local and cloud LLMs"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "fastapi>=0.115.0",
     "google-genai>=2.23.0",
     "openai>=3.14.1",
     "prompt-toolkit>=3.0.53",
@@ -12,6 +13,8 @@ dependencies = [
     "pytest-asyncio>=1.4.0",
     "pyyaml>=6.0.3",
     "rich>=15.0.0",
+    "uvicorn[standard]>=0.30.0",
+    "websockets>=13.0",
 ]
 
 [project.scripts]

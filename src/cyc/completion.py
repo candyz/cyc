@@ -8,7 +8,7 @@ _cyc_completion() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent --chat -y --yes --read-only -r --resume --sessions --trust --no-trust --completion init"
+    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent --chat -y --yes --read-only -r --resume --sessions --trust --no-trust --completion --web --port --host --token --no-open init web"
     providers="ollama openrouter omlx nvidia gemini agy opencode"
 
     case "${prev}" in
@@ -33,8 +33,8 @@ _cyc_completion() {
             COMPREPLY=( $(compgen -W "bash zsh" -- "${cur}") )
             return 0
             ;;
-        -m|--model|-s|--system)
-            # Cannot statically autocomplete freeform text/model
+        -m|--model|-s|--system|--port|--host|--token)
+            # Freeform text/numbers
             return 0
             ;;
     esac
@@ -69,6 +69,11 @@ _cyc() {
         '--trust[Explicitly trust current workspace without prompting]'
         '--no-trust[Explicitly restrict current workspace (force Read-Only mode)]'
         '--completion[Generate shell completion script (bash or zsh)]:shell:(bash zsh)'
+        '--web[Launch the cyc Web interface server]'
+        '--port[Port for the Web interface]:port:'
+        '--host[Host address to bind for Web interface]:host:'
+        '--token[Authentication token for Web interface]:token:'
+        '--no-open[Do not automatically open the browser]'
         '*:prompt:_files'
     )
     _arguments -s $opts

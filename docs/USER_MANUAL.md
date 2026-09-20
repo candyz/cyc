@@ -256,3 +256,33 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `/undo` | 回退上一輪對話，並可選擇復原工作區檔案修改 |
 | `/clear` | 清空當前對話歷史 |
 | `/exit` 或 `/quit` | 退出對話終端 |
+
+---
+
+## 7. 🌐 Web 遠端操控介面 (Web Interface)
+
+`cyc` 內建現代化 Web 遠端控制介面，支援在本地或遠端瀏覽器中監控、驅動 Agent 運作，並即時檢視檔案樹與執行過程。
+
+### 7.1 啟動 Web 伺服器
+```bash
+# 基本啟動（自動產生隨機 Token 並開啟瀏覽器）
+cyc web
+
+# 指定監聽位址與埠號
+cyc web --host 0.0.0.0 --port 8080
+
+# 指定固定安全 Token，且啟動時不自動開啟瀏覽器
+cyc web --token my-secret-token --no-open
+```
+
+### 7.2 主要功能特色
+1. **即時雙向串流 (WebSocket Streaming)**：即時視覺化 Assistant 思考過程、工具呼叫 (`tool_call`) 與執行結果 (`observation`)。
+2. **三欄現代化 SPA 介面**：
+   - **左側欄**：歷史會話清單（支援檢視與一鍵切換）及工作區檔案樹瀏覽器。
+   - **中央主聊天區**：支援 Markdown 渲染、程式碼高亮、免審批模式 (Auto Approve) 與隨時中斷按鈕 (Cancel)。
+   - **右側抽屜**：詳細工具執行輸出與即時程式碼 Diff 預覽。
+3. **安全防護**：
+   - 內建 Token 認證中介層（URL Token 與 HTTP Bearer Header 雙重支援）。
+   - 工作區路徑檢查，嚴格防止目錄遍歷 (Path Traversal)。
+   - 支援可配置 CORS 網域。
+

@@ -1,0 +1,93 @@
+import asyncio
+from pathlib import Path
+import pytest
+from fastapi.testclient import TestClient
+
+from cyc.config import Config, DEFAULT_CONFIG_DICT
+from cyc.web.app import create_app
+
+
+@pytest.fixture
+def web_test_client(tmp_path):
+    config = Config(**DEFAULT_CONFIG_DICT)
+    config.web.auth_token = "secret123"
+    app = create_app(config=config, auth_token="secret123", workspace_path=tmp_path)
+    return TestClient(app)
+
+
+def test_web_auth_failure(web_test_client):
+    res = web_test_client.get("/api/status")
+    assert res.status_code == 401
+
+
+def test_web_auth_success_with_query_token(web_test_client):
+    res = web_test_client.get("/api/status?token=secret123")
+    assert res.status_code == 200
+    data = res.json()
+    assert "version" in data
+    assert "workspace" in data
+    assert "providers" in data
+
+
+def test_web_auth_success_with_header(web_test_client):
+    res = web_test_client.get("/api/status", headers={"Authorization": "Bearer secret123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "version" in data
+
+
+def test_web_providers_and_models(web_test_client):
+    res = web_test_client.get("/api/providers", headers={"Authorization": "Bearer secret123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "providers" in data
+    assert len(data["providers"]) > 0
+
+
+def test_web_sessions_list_and_create(web_test_client):
+    # List sessions
+    res = web_test_client.get("/api/sessions", headers={"Authorization": "Bearer secret123"})
+    assert res.status_code == 200
+    assert "sessions" in res.json()
+
+    # Create session
+    create_res = web_test_client.post(
+        "/api/sessions",
+        headers={"Authorization": "Bearer secret123"},
+        json={"mode": "agent"},
+    )
+    assert create_res.status_code == 200
+    created = create_res.json()
+    assert "session_id" in created
+
+    # Get single session
+    sess_id = created["session_id"]
+    get_res = web_test_client.get(f"/api/sessions/{sess_id}", headers={"Authorization": "Bearer secret123"})
+    assert get_res.status_code == 200
+    assert get_res.json()["session_id"] == sess_id
+
+
+def test_web_file_browsing(web_test_client, tmp_path):
+    test_file = tmp_path / "sample.py"
+    test_file.write_text("print('hello cyc web')", encoding="utf-8")
+
+    # List directory
+    res = web_test_client.get("/api/files", headers={"Authorization": "Bearer secret123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["type"] == "directory"
+    names = [item["name"] for item in data["items"]]
+    assert "sample.py" in names
+
+    # Read file
+    res_file = web_test_client.get("/api/files?path=sample.py", headers={"Authorization": "Bearer secret123"})
+    assert res_file.status_code == 200
+    file_data = res_file.json()
+    assert file_data["type"] == "file"
+    assert "hello cyc web" in file_data["content"]
+
+
+def test_web_index_html_serving(web_test_client):
+    res = web_test_client.get("/")
+    assert res.status_code == 200
+    assert "cyc" in res.text

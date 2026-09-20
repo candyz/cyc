@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cyc - Web Interface</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    .prose pre { background: #1e1e1e; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+    .prose code { color: #f87171; font-family: monospace; }
+    .prose pre code { color: #f3f4f6; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #18181b; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 flex flex-col h-screen overflow-hidden">
+
+  <!-- Header -->
+  <header class="bg-zinc-900 border-b border-zinc-800 px-4 py-2.5 flex items-center justify-between shrink-0">
+    <div class="flex items-center space-x-3">
+      <span class="font-extrabold text-xl tracking-wider text-emerald-400">cyc</span>
+      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v0.14.0</span>
+      <div class="hidden sm:flex items-center space-x-2 text-xs text-zinc-400 border-l border-zinc-700 pl-3">
+        <span>Workspace:</span>
+        <span class="text-zinc-200 font-mono" id="wsName">loading...</span>
+      </div>
+    </div>
+
+    <!-- Mode & Provider Controls -->
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-1.5 bg-zinc-950 border border-zinc-700 rounded-lg p-0.5 text-xs">
+        <button id="btnModeAgent" class="px-2.5 py-1 rounded bg-emerald-600 text-white font-medium">🤖 Agent</button>
+        <button id="btnModeChat" class="px-2.5 py-1 rounded text-zinc-400 hover:text-white">💬 Chat</button>
+      </div>
+
+      <select id="selectProvider" class="bg-zinc-800 border border-zinc-700 text-xs rounded-md px-2 py-1.5 text-zinc-200 focus:outline-none focus:border-emerald-500">
+        <option value="">Provider</option>
+      </select>
+
+      <select id="selectModel" class="bg-zinc-800 border border-zinc-700 text-xs rounded-md px-2 py-1.5 text-zinc-200 focus:outline-none focus:border-emerald-500 max-w-[180px]">
+        <option value="">Model</option>
+      </select>
+
+      <button id="btnNewChat" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-1.5 rounded-md flex items-center space-x-1">
+        <span>+ New</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main 3-Column Layout -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- Left Sidebar: Sessions & Files -->
+    <aside class="w-64 bg-zinc-900/60 border-r border-zinc-800 flex flex-col shrink-0 hidden md:flex">
+      <div class="p-3 border-b border-zinc-800 flex justify-between items-center text-xs font-semibold text-zinc-400">
+        <span>RECENT SESSIONS</span>
+        <button id="btnRefreshSessions" class="hover:text-white" title="Refresh">↻</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-2 space-y-1 text-xs" id="sessionList">
+        <div class="text-zinc-500 p-2">載入中...</div>
+      </div>
+
+      <!-- File Explorer Drawer -->
+      <div class="border-t border-zinc-800 p-3 flex justify-between items-center text-xs font-semibold text-zinc-400">
+        <span>FILES EXPLORER</span>
+        <button id="btnRefreshFiles" class="hover:text-white" title="Refresh">↻</button>
+      </div>
+      <div class="h-44 overflow-y-auto p-2 text-xs font-mono space-y-0.5" id="fileTree">
+        <div class="text-zinc-500 p-2">載入目錄中...</div>
+      </div>
+    </aside>
+
+    <!-- Center: Main Chat & Agent Event Stream -->
+    <main class="flex-1 flex flex-col bg-zinc-950 overflow-hidden relative">
+      <!-- Chat Messages Container -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4" id="chatContainer">
+        <!-- Welcome Hero -->
+        <div class="text-center my-8 text-zinc-500" id="welcomeHero">
+          <div class="text-3xl mb-2">⚡</div>
+          <h2 class="text-base font-medium text-zinc-300">cyc 終端與遠端自主編程代理</h2>
+          <p class="text-xs text-zinc-500 mt-1">隨時發起自然語言編程提問、專案巡檢或檔案重構。</p>
+        </div>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="p-3 sm:p-4 bg-zinc-900/80 border-t border-zinc-800 shrink-0">
+        <div class="relative bg-zinc-800/90 border border-zinc-700 rounded-xl p-2 focus-within:border-emerald-500">
+          <textarea id="promptInput" rows="2" class="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none resize-none" placeholder="輸入您的指令或提示詞 (Enter 送出, Shift+Enter 換行)..."></textarea>
+          <div class="flex items-center justify-between pt-1 text-xs text-zinc-500">
+            <div class="flex items-center space-x-2">
+              <label class="flex items-center space-x-1 cursor-pointer hover:text-zinc-300">
+                <input type="checkbox" id="checkAutoApprove" class="rounded bg-zinc-700 border-zinc-600 text-emerald-500">
+                <span>免確認 (Auto Approve)</span>
+              </label>
+              <span id="agentStatus" class="text-emerald-400 font-mono hidden">● 思考中...</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button id="btnCancel" class="hidden px-2 py-1 bg-red-600/80 hover:bg-red-600 text-white rounded font-medium">中斷 (Cancel)</button>
+              <button id="btnSend" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium">送出</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Drawer: Unified Diff & Preview -->
+    <aside class="w-80 lg:w-96 bg-zinc-900 border-l border-zinc-800 flex flex-col shrink-0 hidden lg:flex" id="previewDrawer">
+      <div class="p-3 border-b border-zinc-800 flex items-center justify-between text-xs font-semibold text-zinc-300">
+        <span>PREVIEW & OBSERVATIONS</span>
+        <button id="btnClearPreview" class="text-zinc-500 hover:text-zinc-300">清除</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-3 text-xs font-mono" id="previewContent">
+        <div class="text-zinc-600 italic">當 Agent 呼叫工具或修改檔案時，即時 Observation 與 Diff 將顯示於此。</div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    let authToken = urlParams.get('token') || localStorage.getItem('cyc_token') || '';
+    if (urlParams.get('token')) {
+      localStorage.setItem('cyc_token', urlParams.get('token'));
+    }
+
+    let currentMode = 'agent';
+    let currentSessionId = null;
+    let ws = null;
+
+    // Elements
+    const chatContainer = document.getElementById('chatContainer');
+    const promptInput = document.getElementById('promptInput');
+    const btnSend = document.getElementById('btnSend');
+    const btnCancel = document.getElementById('btnCancel');
+    const agentStatus = document.getElementById('agentStatus');
+    const welcomeHero = document.getElementById('welcomeHero');
+    const sessionList = document.getElementById('sessionList');
+    const fileTree = document.getElementById('fileTree');
+    const previewContent = document.getElementById('previewContent');
+    const selectProvider = document.getElementById('selectProvider');
+    const selectModel = document.getElementById('selectModel');
+    const checkAutoApprove = document.getElementById('checkAutoApprove');
+
+    // Headers with Auth
+    function getHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+      return headers;
+    }
+
+    // Init WebSocket
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/agent?token=${encodeURIComponent(authToken)}`;
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => console.log("WebSocket connected");
+      ws.onclose = () => {
+        console.log("WebSocket disconnected, reconnecting in 2s...");
+        setTimeout(connectWebSocket, 2000);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleAgentEvent(msg);
+        } catch (e) {
+          console.error("WS Parse error", e);
+        }
+      };
+    }
+
+    function handleAgentEvent(event) {
+      if (welcomeHero) welcomeHero.style.display = 'none';
+
+      if (event.type === 'thinking') {
+        agentStatus.classList.remove('hidden');
+        agentStatus.innerText = `● 思考與規劃中 (回合 ${event.turn}/${event.max_turns})...`;
+        btnCancel.classList.remove('hidden');
+      } else if (event.type === 'tool_call') {
+        addToolCallCard(event.name, event.arguments);
+      } else if (event.type === 'tool_result') {
+        addObservationCard(event.name, event.observation);
+      } else if (event.type === 'message') {
+        addAssistantMessage(event.content);
+      } else if (event.type === 'turn_complete' || event.type === 'done') {
+        agentStatus.classList.add('hidden');
+        btnCancel.classList.add('hidden');
+        if (event.session_id) currentSessionId = event.session_id;
+        loadSessions();
+      } else if (event.type === 'cancelled') {
+        agentStatus.classList.add('hidden');
+        btnCancel.classList.add('hidden');
+        addSystemNotice("⚠️ 任務已由使用者中斷。");
+      } else if (event.type === 'error') {
+        agentStatus.classList.add('hidden');
+        btnCancel.classList.add('hidden');
+        addSystemNotice(`❌ 發生錯誤: ${event.error}`);
+      }
+    }
+
+    function addMessageBubble(role, text) {
+      const div = document.createElement('div');
+      div.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+
+      const inner = document.createElement('div');
+      inner.className = role === 'user'
+        ? 'bg-emerald-600 text-white p-3 rounded-2xl max-w-2xl text-sm whitespace-pre-wrap'
+        : 'bg-zinc-900 border border-zinc-800 text-zinc-100 p-4 rounded-2xl max-w-3xl text-sm prose prose-invert w-full';
+
+      if (role === 'user') {
+        inner.innerText = text;
+      } else {
+        inner.innerHTML = marked.parse(text);
+      }
+
+      div.appendChild(inner);
+      chatContainer.appendChild(div);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function addAssistantMessage(content) {
+      addMessageBubble('assistant', content);
+    }
+
+    function addToolCallCard(name, args) {
+      const card = document.createElement('div');
+      card.className = 'border border-cyan-800/60 bg-cyan-950/20 p-3 rounded-xl text-xs space-y-1.5';
+      card.innerHTML = `
+        <div class="flex items-center justify-between text-cyan-400 font-semibold">
+          <span>⚡ Tool Call: ${name}</span>
+          <span class="text-zinc-500 text-[10px]">Calling...</span>
+        </div>
+        <pre class="bg-black/40 p-2 rounded text-zinc-300 overflow-x-auto text-[11px]">${JSON.stringify(args, null, 2)}</pre>
+      `;
+      chatContainer.appendChild(card);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      // Update right drawer preview
+      previewContent.innerHTML = `
+        <div class="text-cyan-400 font-bold mb-1">Tool: ${name}</div>
+        <pre class="p-2 bg-black/60 rounded text-zinc-300 text-[11px] overflow-x-auto">${JSON.stringify(args, null, 2)}</pre>
+      `;
+    }
+
+    function addObservationCard(name, observation) {
+      const card = document.createElement('div');
+      card.className = 'border border-emerald-800/40 bg-emerald-950/10 p-3 rounded-xl text-xs space-y-1';
+      const preview = observation.slice(0, 300) + (observation.length > 300 ? '...' : '');
+      card.innerHTML = `
+        <div class="text-emerald-400 font-semibold">✓ Observation: ${name}</div>
+        <div class="text-zinc-300 whitespace-pre-wrap font-mono text-[11px]">${preview}</div>
+      `;
+      chatContainer.appendChild(card);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      // Update right drawer preview
+      previewContent.innerHTML += `
+        <div class="text-emerald-400 font-bold mt-3 mb-1">✓ Observation: ${name}</div>
+        <pre class="p-2 bg-black/60 rounded text-zinc-300 text-[11px] overflow-x-auto whitespace-pre-wrap">${observation}</pre>
+      `;
+    }
+
+    function addSystemNotice(text) {
+      const div = document.createElement('div');
+      div.className = 'text-center my-2 text-xs text-yellow-500';
+      div.innerText = text;
+      chatContainer.appendChild(div);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function sendQuery() {
+      const text = promptInput.value.trim();
+      if (!text) return;
+
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        alert("WebSocket 尚未連線，請稍候重試");
+        return;
+      }
+
+      addMessageBubble('user', text);
+      promptInput.value = '';
+
+      ws.send(JSON.stringify({
+        action: 'query',
+        prompt: text,
+        session_id: currentSessionId,
+        mode: currentMode,
+        provider: selectProvider.value || undefined,
+        model: selectModel.value || undefined,
+        auto_approve: checkAutoApprove.checked,
+      }));
+    }
+
+    // Event Listeners
+    btnSend.onclick = sendQuery;
+    btnCancel.onclick = () => {
+      if (ws) ws.send(JSON.stringify({ action: 'cancel' }));
+    };
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendQuery();
+      }
+    });
+
+    document.getElementById('btnModeAgent').onclick = () => {
+      currentMode = 'agent';
+      document.getElementById('btnModeAgent').className = 'px-2.5 py-1 rounded bg-emerald-600 text-white font-medium';
+      document.getElementById('btnModeChat').className = 'px-2.5 py-1 rounded text-zinc-400 hover:text-white';
+    };
+
+    document.getElementById('btnModeChat').onclick = () => {
+      currentMode = 'chat';
+      document.getElementById('btnModeChat').className = 'px-2.5 py-1 rounded bg-emerald-600 text-white font-medium';
+      document.getElementById('btnModeAgent').className = 'px-2.5 py-1 rounded text-zinc-400 hover:text-white';
+    };
+
+    document.getElementById('btnNewChat').onclick = () => {
+      currentSessionId = null;
+      chatContainer.innerHTML = '';
+      if (welcomeHero) {
+        chatContainer.appendChild(welcomeHero);
+        welcomeHero.style.display = 'block';
+      }
+    };
+
+    document.getElementById('btnClearPreview').onclick = () => {
+      previewContent.innerHTML = '<div class="text-zinc-600 italic">清空完成。</div>';
+    };
+
+    // Load Metadata
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status', { headers: getHeaders() });
+        if (res.status === 401) {
+          const pass = prompt("請輸入 cyc Web 認證 Token:");
+          if (pass) {
+            authToken = pass;
+            localStorage.setItem('cyc_token', pass);
+            location.reload();
+          }
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('wsName').innerText = data.workspace_name || 'workspace';
+        document.getElementById('appVersion').innerText = `v${data.version}`;
+        if (data.agent_config && data.agent_config.auto_approve) {
+          checkAutoApprove.checked = true;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadProviders() {
+      try {
+        const res = await fetch('/api/providers', { headers: getHeaders() });
+        const data = await res.json();
+        selectProvider.innerHTML = '';
+        data.providers.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.name;
+          opt.innerText = p.name;
+          if (p.name === data.default_provider) opt.selected = true;
+          selectProvider.appendChild(opt);
+        });
+        loadModels();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadModels() {
+      try {
+        const prov = selectProvider.value;
+        const res = await fetch(`/api/models?provider=${encodeURIComponent(prov)}`, { headers: getHeaders() });
+        const data = await res.json();
+        selectModel.innerHTML = '';
+        if (data.models && data.models.length) {
+          data.models.forEach(m => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.innerText = m;
+            selectModel.appendChild(opt);
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    selectProvider.onchange = loadModels;
+
+    async function loadSessions() {
+      try {
+        const res = await fetch('/api/sessions?source=all', { headers: getHeaders() });
+        const data = await res.json();
+        sessionList.innerHTML = '';
+        data.sessions.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'p-2 rounded hover:bg-zinc-800 cursor-pointer text-zinc-300 truncate transition flex justify-between items-center';
+          item.innerHTML = `
+            <div class="truncate flex-1">
+              <div class="font-medium text-zinc-200 truncate">${s.preview || s.session_id}</div>
+              <div class="text-[10px] text-zinc-500">${s.mode || 'agent'} · ${s.provider || 'local'}</div>
+            </div>
+          `;
+          item.onclick = () => loadSessionDetail(s.session_id);
+          sessionList.appendChild(item);
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadSessionDetail(sessionId) {
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { headers: getHeaders() });
+        const session = await res.json();
+        currentSessionId = session.session_id;
+        chatContainer.innerHTML = '';
+        if (session.messages) {
+          session.messages.forEach(m => {
+            if (m.role === 'user') {
+              addMessageBubble('user', m.content);
+            } else if (m.role === 'assistant') {
+              if (m.content) addMessageBubble('assistant', m.content);
+            }
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadFiles(path = '') {
+      try {
+        const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`, { headers: getHeaders() });
+        const data = await res.json();
+        fileTree.innerHTML = '';
+        if (data.items) {
+          data.items.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'truncate hover:text-emerald-400 cursor-pointer text-zinc-400 py-0.5';
+            row.innerText = (item.is_dir ? '📁 ' : '📄 ') + item.name;
+            row.onclick = () => {
+              if (item.is_dir) {
+                loadFiles(item.path);
+              } else {
+                fetchFileContent(item.path);
+              }
+            };
+            fileTree.appendChild(row);
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchFileContent(filePath) {
+      try {
+        const res = await fetch(`/api/files?path=${encodeURIComponent(filePath)}`, { headers: getHeaders() });
+        const data = await res.json();
+        previewContent.innerHTML = `
+          <div class="text-zinc-200 font-bold mb-1">${data.path}</div>
+          <pre class="p-2 bg-black/60 rounded text-zinc-300 text-[11px] overflow-x-auto whitespace-pre">${data.content}</pre>
+        `;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    document.getElementById('btnRefreshSessions').onclick = loadSessions;
+    document.getElementById('btnRefreshFiles').onclick = () => loadFiles('');
+
+    // Startup
+    loadStatus();
+    loadProviders();
+    loadSessions();
+    loadFiles();
+    connectWebSocket();
+  </script>
+</body>
+</html>

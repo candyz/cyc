@@ -46,6 +46,16 @@ class AgentConfig(BaseModel):
     auto_approve: bool = False  # If True, equivalent to --yes
     default_trust: Optional[bool] = None  # True (trust), False (no-trust), or None (interactive prompt)
 
+class WebConfig(BaseModel):
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 8888
+    auth_token: str = ""
+    cors_origins: List[str] = Field(default_factory=lambda: ["*"])
+    ssl_cert: Optional[str] = None
+    ssl_key: Optional[str] = None
+    enable_terminal: bool = True
+
 class Config(BaseModel):
     default_provider: str = "ollama"
     default_model: str = ""
@@ -54,6 +64,7 @@ class Config(BaseModel):
     skills_dirs: List[str] = Field(default_factory=list)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
+    web: WebConfig = Field(default_factory=WebConfig)
 
     def get_provider(self, name: Optional[str] = None) -> ProviderConfig:
         provider_name = name or self.default_provider
@@ -112,7 +123,17 @@ DEFAULT_CONFIG_DICT = {
         "theme": "monokai",
         "stream": True,
         "markdown_render": True,
-    }
+    },
+    "web": {
+        "enabled": False,
+        "host": "127.0.0.1",
+        "port": 8888,
+        "auth_token": "",
+        "cors_origins": ["*"],
+        "ssl_cert": None,
+        "ssl_key": None,
+        "enable_terminal": True,
+    },
 }
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "cyc" / "config.yaml"
@@ -134,6 +155,11 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         merged_agent = dict(DEFAULT_CONFIG_DICT.get("agent", {}))
         merged_agent.update(user_data.get("agent", {}))
         raw_data["agent"] = merged_agent
+
+        # Merge web section defaults
+        merged_web = dict(DEFAULT_CONFIG_DICT.get("web", {}))
+        merged_web.update(user_data.get("web", {}))
+        raw_data["web"] = merged_web
     else:
         raw_data = DEFAULT_CONFIG_DICT
 
@@ -215,6 +241,16 @@ ui:
   theme: "monokai"
   stream: true
   markdown_render: true
+
+# Web remote interface configuration
+web:
+  enabled: false
+  host: "127.0.0.1"
+  port: 8888
+  auth_token: ""                  # Leave empty to generate a random 32-char token on launch
+  cors_origins:
+    - "*"
+  enable_terminal: true           # Enable embedded xterm terminal
 """
 
 def init_config_file(dest_path: Optional[Path] = None, force: bool = False) -> Path:
