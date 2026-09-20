@@ -1,0 +1,29 @@
+# cyc Telegram Bot Daemon - Systemd Service Unit
+# Save this file to: ~/.config/systemd/user/cyc-bot.service (User mode)
+# or /etc/systemd/system/cyc-bot.service (System mode)
+
+[Unit]
+Description=cyc Autonomous Coding Agent Telegram Bot Gateway
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Path to cyc executable (adjust to `which cyc`)
+ExecStart=%h/.local/bin/cyc bot
+# Default working directory
+WorkingDirectory=%h
+# Environment variables (or load from /etc/environment or ~/.config/cyc/env)
+Environment=PYTHONUNBUFFERED=1
+# Optional: Set token here if not defined in ~/.config/cyc/config.yaml
+# Environment=TELEGRAM_BOT_TOKEN=your_token_here
+
+# Automatic restart on crash
+Restart=always
+RestartSec=5s
+
+# Security sandboxing options
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

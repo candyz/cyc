@@ -340,9 +340,30 @@ cyc bot --bot-token "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
    - 生成過程依設定間隔平滑編輯訊息 Bubble，不觸發 Telegram API 限額。
    - 超長程式碼輸出自動切割為多則訊息，並確保 Markdown 標籤修復不破版。
 4. **專屬 Telegram 指令集**：
-   - `/start`：顯示歡迎介面、工作目錄與功能清單。
+   - `/start`：顯示歡迎介面、工作目錄、目前模型與指令清單。
    - `/mode <agent|chat>`：即時切換自主 Agent 迴圈或純交談 Chat 模式。
-   - `/status`：查看當前工作目錄、會話 ID、歷史訊息數與審批模式。
+   - `/model [name]`：查看或切換模型（未帶參數時自動彈出 Inline Keyboard 列表按鈕供點擊切換）。
+   - `/cd <path>`：動態切換遠端工作目錄（支援絕對路徑或相對路徑）。
+   - `/status`：查看當前工作目錄、會話 ID、使用模型、歷史訊息數與審批模式。
    - `/undo`：回退上一輪會話歷程。
    - `/stop`：緊急中斷正在背景執行的 Agent 任務。
    - `/clear`：清空當前會話歷史。
+   - `!<command>`：快速執行本機 Shell 指令（例如 `!git status`, `!pytest`），輸出超過長度時自動轉換為文字附件發送。
+5. **大型 Diff 與輸出自動轉檔案附件**：
+   - 當變更範圍過長時，自動打包為 `change.patch` 附件上傳，兼顧閱讀與手機下載保存。
+
+### 8.4 背景常駐服務 (Daemon Setup)
+`cyc` 於 `docs/daemon/` 提供主流平台的系統常駐服務範本：
+- **Linux (`systemd`)**：[`docs/daemon/cyc-bot.service`](file:///Users/candyz/AI/agy/cyc/docs/daemon/cyc-bot.service)
+  ```bash
+  mkdir -p ~/.config/systemd/user
+  cp docs/daemon/cyc-bot.service ~/.config/systemd/user/
+  systemctl --user daemon-reload
+  systemctl --user enable --now cyc-bot
+  ```
+- **macOS (`launchd`)**：[`docs/daemon/com.candyz.cyc-bot.plist`](file:///Users/candyz/AI/agy/cyc/docs/daemon/com.candyz.cyc-bot.plist)
+  ```bash
+  cp docs/daemon/com.candyz.cyc-bot.plist ~/Library/LaunchAgents/
+  launchctl load ~/Library/LaunchAgents/com.candyz.cyc-bot.plist
+  ```
+

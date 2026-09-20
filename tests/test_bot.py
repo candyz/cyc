@@ -183,3 +183,58 @@ async def test_bot_service_hitl_approval_callback():
         assert fut.result() is True
         assert mock_ans.called
         assert mock_edit.called
+
+
+@pytest.mark.asyncio
+async def test_bot_service_model_and_cd_and_shell(tmp_path):
+    cfg = Config(**DEFAULT_CONFIG_DICT)
+    cfg.bot.telegram.token = "fake_token"
+    cfg.bot.telegram.allowed_user_ids = [123]
+
+    service = TelegramBotService(config=cfg)
+
+    with patch.object(service.client, "send_message", new_callable=AsyncMock) as mock_send, \
+         patch.object(service.client, "edit_message_text", new_callable=AsyncMock) as mock_edit, \
+         patch.object(service.client, "answer_callback_query", new_callable=AsyncMock) as mock_ans:
+
+        # Test /model direct switch
+        await service.handle_message({
+            "message_id": 1,
+            "from": {"id": 123},
+            "chat": {"id": 123},
+            "text": "/model llama-3.3",
+        })
+        assert "Model switched to: <code>llama-3.3</code>" in mock_send.call_args.kwargs["text"]
+        assert service.chat_models[123] == "llama-3.3"
+
+        # Test callback query model selection
+        await service.handle_callback_query({
+            "id": "cb_model",
+            "from": {"id": 123},
+            "data": "set_model:gpt-4o",
+            "message": {"chat": {"id": 123}, "message_id": 2, "text": "Select model"},
+        })
+        assert service.chat_models[123] == "gpt-4o"
+        assert mock_ans.called
+        assert mock_edit.called
+
+        # Test /cd command
+        subdir = tmp_path / "subproject"
+        subdir.mkdir()
+        await service.handle_message({
+            "message_id": 3,
+            "from": {"id": 123},
+            "chat": {"id": 123},
+            "text": f"/cd {subdir}",
+        })
+        assert service.workspace_path == subdir.resolve()
+
+        # Test !shell command
+        await service.handle_message({
+            "message_id": 4,
+            "from": {"id": 123},
+            "chat": {"id": 123},
+            "text": "!echo 'hello telegram shell'",
+        })
+        assert "hello telegram shell" in mock_send.call_args.kwargs["text"]
+

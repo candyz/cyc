@@ -1,6 +1,6 @@
 """CLI Chat - Multi-backend CLI chat and autonomous coding agent."""
 
-__version__ = "0.18.0"
+__version__ = "1.0.0"
 
 
 
