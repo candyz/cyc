@@ -28,7 +28,7 @@
   <header class="bg-zinc-900 border-b border-zinc-800 px-4 py-2.5 flex items-center justify-between shrink-0">
     <div class="flex items-center space-x-3">
       <span class="font-extrabold text-xl tracking-wider text-emerald-400">cyc</span>
-      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v0.15.0</span>
+      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v0.16.0</span>
       <div class="hidden sm:flex items-center space-x-2 text-xs text-zinc-400 border-l border-zinc-700 pl-3">
         <span>Workspace:</span>
         <span class="text-zinc-200 font-mono" id="wsName">loading...</span>
@@ -49,6 +49,18 @@
       <select id="selectModel" class="bg-zinc-800 border border-zinc-700 text-xs rounded-md px-2 py-1.5 text-zinc-200 focus:outline-none focus:border-emerald-500 max-w-[180px]">
         <option value="">Model</option>
       </select>
+
+      <!-- Token Gauge & Compact Button -->
+      <div class="hidden xl:flex items-center space-x-2 bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1 text-xs">
+        <span class="text-zinc-400">Tokens:</span>
+        <div class="w-20 bg-zinc-800 rounded-full h-2 overflow-hidden relative">
+          <div id="tokenBar" class="bg-emerald-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <span id="tokenText" class="text-zinc-300 font-mono text-[11px]">0 / 128k</span>
+        <button id="btnCompact" class="ml-1 px-1.5 py-0.5 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 hover:text-emerald-300 rounded border border-zinc-700 font-medium" title="手動觸發上下文壓縮 (Compact Context)">
+          ⚡ Compact
+        </button>
+      </div>
 
       <button id="btnToggleTerminal" class="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 px-3 py-1.5 rounded-md flex items-center space-x-1" title="開啟/收合終端視窗">
         <span>💻 Terminal</span>
@@ -129,14 +141,30 @@
       </div>
     </main>
 
-    <!-- Right Drawer: Unified Diff & Preview -->
+    <!-- Right Drawer: Unified Diff & Preview & MCP Topology -->
     <aside class="w-80 lg:w-96 bg-zinc-900 border-l border-zinc-800 flex flex-col shrink-0 hidden lg:flex" id="previewDrawer">
-      <div class="p-3 border-b border-zinc-800 flex items-center justify-between text-xs font-semibold text-zinc-300">
-        <span>PREVIEW & OBSERVATIONS</span>
-        <button id="btnClearPreview" class="text-zinc-500 hover:text-zinc-300">清除</button>
+      <div class="p-2.5 border-b border-zinc-800 flex items-center justify-between text-xs font-semibold">
+        <div class="flex items-center space-x-1">
+          <button id="tabBtnPreview" class="px-2.5 py-1 rounded bg-zinc-800 text-emerald-400 font-medium">Preview / Diff</button>
+          <button id="tabBtnMcp" class="px-2.5 py-1 rounded text-zinc-400 hover:text-zinc-200">🔌 MCP Servers</button>
+        </div>
+        <button id="btnClearPreview" class="text-zinc-500 hover:text-zinc-300 text-xs">清除</button>
       </div>
+
+      <!-- Tab 1: Preview & Observations -->
       <div class="flex-1 overflow-y-auto p-3 text-xs font-mono" id="previewContent">
         <div class="text-zinc-600 italic">當 Agent 呼叫工具或修改檔案時，即時 Observation 與 Diff 將顯示於此。</div>
+      </div>
+
+      <!-- Tab 2: MCP Topology & Servers -->
+      <div class="flex-1 overflow-y-auto p-3 text-xs space-y-3 hidden" id="mcpContent">
+        <div class="flex justify-between items-center text-zinc-400 font-semibold border-b border-zinc-800 pb-2">
+          <span>CONFIGURED MCP SERVERS</span>
+          <button id="btnRefreshMcp" class="hover:text-white" title="Refresh">↻</button>
+        </div>
+        <div id="mcpList" class="space-y-2">
+          <div class="text-zinc-500 italic">載入 MCP 設定中...</div>
+        </div>
       </div>
     </aside>
 
@@ -216,7 +244,16 @@
       } else if (event.type === 'turn_complete' || event.type === 'done') {
         agentStatus.classList.add('hidden');
         btnCancel.classList.add('hidden');
-        if (event.session_id) currentSessionId = event.session_id;
+        if (event.session_id) {
+          currentSessionId = event.session_id;
+          fetch(`/api/sessions/${encodeURIComponent(currentSessionId)}`, { headers: getHeaders() })
+            .then(res => res.json())
+            .then(s => {
+              if (s && s.estimated_tokens) {
+                updateTokenUsage(s.estimated_tokens, s.max_context_tokens || 128000);
+              }
+            }).catch(() => {});
+        }
         loadSessions();
       } else if (event.type === 'cancelled') {
         agentStatus.classList.add('hidden');
@@ -491,6 +528,7 @@
         const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { headers: getHeaders() });
         const session = await res.json();
         currentSessionId = session.session_id;
+        updateTokenUsage(session.estimated_tokens || 0, session.max_context_tokens || 128000);
         chatContainer.innerHTML = '';
         if (session.messages) {
           session.messages.forEach(m => {
@@ -643,6 +681,117 @@
     btnClearTerminal.onclick = () => {
       if (term) term.clear();
     };
+
+    // ------------------ Token Dashboard & Compact ------------------
+    const tokenBar = document.getElementById('tokenBar');
+    const tokenText = document.getElementById('tokenText');
+    const btnCompact = document.getElementById('btnCompact');
+
+    function updateTokenUsage(used, maxTokens = 128000) {
+      if (!maxTokens || maxTokens <= 0) maxTokens = 128000;
+      const pct = Math.min(100, Math.round((used / maxTokens) * 100));
+      tokenBar.style.width = `${pct}%`;
+      if (pct > 80) {
+        tokenBar.className = 'bg-red-500 h-2 rounded-full transition-all duration-300';
+      } else if (pct > 50) {
+        tokenBar.className = 'bg-yellow-500 h-2 rounded-full transition-all duration-300';
+      } else {
+        tokenBar.className = 'bg-emerald-500 h-2 rounded-full transition-all duration-300';
+      }
+      tokenText.innerText = `${used.toLocaleString()} / ${Math.round(maxTokens / 1000)}k (${pct}%)`;
+    }
+
+    btnCompact.onclick = async () => {
+      if (!currentSessionId) {
+        alert("尚未選取或建立任何 Session，無法執行壓縮。");
+        return;
+      }
+      btnCompact.innerText = "⚡ Compacting...";
+      btnCompact.disabled = true;
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSessionId)}/compact?ratio=0.50`, {
+          method: 'POST',
+          headers: getHeaders(),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          const r = data.result;
+          addSystemNotice(`⚡ 上下文已壓縮！節省 ${r.saved_tokens} tokens (自 ${r.initial_tokens} 降至 ${r.final_tokens}，裁剪 ${r.pruned_count} 則舊訊息)。`);
+          loadSessionDetail(currentSessionId);
+        } else {
+          alert(`壓縮失敗: ${data.detail || '未知錯誤'}`);
+        }
+      } catch (e) {
+        alert(`壓縮發生錯誤: ${e}`);
+      } finally {
+        btnCompact.innerText = "⚡ Compact";
+        btnCompact.disabled = false;
+      }
+    };
+
+    // ------------------ MCP Servers & Topology Tab ------------------
+    const tabBtnPreview = document.getElementById('tabBtnPreview');
+    const tabBtnMcp = document.getElementById('tabBtnMcp');
+    const previewTabContent = document.getElementById('previewContent');
+    const mcpTabContent = document.getElementById('mcpContent');
+    const mcpList = document.getElementById('mcpList');
+    const btnRefreshMcp = document.getElementById('btnRefreshMcp');
+
+    tabBtnPreview.onclick = () => {
+      tabBtnPreview.className = 'px-2.5 py-1 rounded bg-zinc-800 text-emerald-400 font-medium';
+      tabBtnMcp.className = 'px-2.5 py-1 rounded text-zinc-400 hover:text-zinc-200';
+      previewTabContent.classList.remove('hidden');
+      mcpTabContent.classList.add('hidden');
+    };
+
+    tabBtnMcp.onclick = () => {
+      tabBtnMcp.className = 'px-2.5 py-1 rounded bg-zinc-800 text-emerald-400 font-medium';
+      tabBtnPreview.className = 'px-2.5 py-1 rounded text-zinc-400 hover:text-zinc-200';
+      mcpTabContent.classList.remove('hidden');
+      previewTabContent.classList.add('hidden');
+      loadMcpServers();
+    };
+
+    btnRefreshMcp.onclick = loadMcpServers;
+
+    async function loadMcpServers() {
+      mcpList.innerHTML = '<div class="text-zinc-500 italic">檢查 MCP 拓撲與狀態中...</div>';
+      try {
+        const res = await fetch('/api/mcp', { headers: getHeaders() });
+        const data = await res.json();
+        mcpList.innerHTML = '';
+        if (!data.mcp_servers || data.mcp_servers.length === 0) {
+          mcpList.innerHTML = `
+            <div class="p-3 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-500 text-center">
+              <div>🔌 尚未配置任何 MCP 伺服器</div>
+              <div class="text-[10px] text-zinc-600 mt-1">可在 ~/.config/cyc/config.yaml 中的 mcp_servers 區塊定義。</div>
+            </div>
+          `;
+          return;
+        }
+
+        data.mcp_servers.forEach(srv => {
+          const card = document.createElement('div');
+          const isOk = srv.is_available;
+          card.className = `p-3 rounded-lg border text-xs space-y-1.5 ${isOk ? 'border-zinc-700 bg-zinc-950' : 'border-red-900/50 bg-red-950/20'}`;
+          card.innerHTML = `
+            <div class="flex items-center justify-between font-bold">
+              <span class="${isOk ? 'text-emerald-400' : 'text-red-400'}">● ${srv.name}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono ${isOk ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40' : 'bg-red-950 text-red-300 border border-red-800/40'}">${srv.status}</span>
+            </div>
+            <div class="text-zinc-400 font-mono text-[11px] truncate" title="${srv.command_resolved}">
+              <span class="text-zinc-500">Cmd:</span> ${srv.command} ${srv.args ? srv.args.join(' ') : ''}
+            </div>
+            <div class="text-zinc-500 text-[10px] truncate" title="${srv.cwd}">
+              <span>Dir:</span> ${srv.cwd}
+            </div>
+          `;
+          mcpList.appendChild(card);
+        });
+      } catch (e) {
+        mcpList.innerHTML = `<div class="text-red-400">載入 MCP 失敗: ${e}</div>`;
+      }
+    }
 
     // Startup
     loadStatus();

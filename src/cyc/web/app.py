@@ -27,11 +27,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from cyc import __version__
+import shutil
 from cyc.adapters import SessionAdapters
 from cyc.agent import (
     AgentLoop,
     PermissionManager,
     PermissionMode,
+    StdioMCPClient,
     ToolRegistry,
     WorkspaceTrustManager,
     get_default_tools,
@@ -155,6 +157,24 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
         except Exception as e:
             return {"provider": target_provider_name, "models": [], "error": str(e)}
 
+    @app.get("/api/mcp")
+    async def get_mcp_servers():
+        """List configured MCP servers, executable check, arguments, and topology."""
+        servers = []
+        for name, mcp_cfg in cfg.mcp_servers.items():
+            cmd_resolved = shutil.which(mcp_cfg.command) or mcp_cfg.command
+            cmd_exists = bool(shutil.which(mcp_cfg.command) or Path(mcp_cfg.command).exists())
+            servers.append({
+                "name": name,
+                "command": mcp_cfg.command,
+                "command_resolved": cmd_resolved,
+                "args": mcp_cfg.args,
+                "cwd": mcp_cfg.cwd or str(ws_path),
+                "is_available": cmd_exists,
+                "status": "ready" if cmd_exists else "executable_not_found",
+            })
+        return {"mcp_servers": servers, "total": len(servers)}
+
     @app.get("/api/sessions")
     async def list_sessions(source: str = "all"):
         sessions = []
@@ -213,6 +233,19 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
             target_file.unlink()
             return {"status": "deleted", "session_id": session_id}
         raise HTTPException(status_code=404, detail="Session file not found")
+
+    @app.post("/api/sessions/{session_id}/compact")
+    async def compact_session(session_id: str, ratio: float = 0.50):
+        session = SessionManager.find_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        compact_res = session.compact(target_ratio=ratio)
+        return {
+            "status": "compacted",
+            "session_id": session_id,
+            "result": compact_res,
+            "session": session.to_dict(),
+        }
 
     @app.get("/api/files")
     async def list_files(path: str = ""):

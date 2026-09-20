@@ -287,7 +287,12 @@ cyc web --token my-secret-token --no-open
 4. **內嵌式 Web Terminal (xterm.js + PTY Bridge)**：
    - 點擊頂部 `💻 Terminal` 按鈕即可自底部拉出擬真 Web 終端。
    - 透過 `/ws/terminal` 橋接系統原生 PTY（Bash / Zsh），直接於瀏覽器內執行 `git status`, `pytest` 等 Shell 指令。
-5. **安全防護與 SSL/TLS**：
+5. **Token 消耗儀表板與一鍵上下文壓縮 (`⚡ Compact`)**：
+   - 頂部導覽列即時顯示目前 Session 的 Token 佔比進度條（色彩隨水位自綠變黃轉紅）。
+   - 支援點擊 `⚡ Compact` 按鈕，直接呼叫後端 `/api/sessions/{id}/compact` 對過長歷史進行摘要壓縮並精簡工具輸出。
+6. **視覺化 MCP 伺服器狀態與連線拓撲 (`🔌 MCP Servers`)**：
+   - 右側抽屜提供專屬 MCP 分頁，即時列出所有配置之 MCP Server 名稱、可執行檔路徑、工作目錄與健康連線狀態（`ready` / `executable_not_found`）。
+7. **安全防護與 SSL/TLS**：
    - 內建 Token 認證中介層（URL Token 與 HTTP Bearer Header 雙重支援）。
    - 工作區路徑檢查，嚴格防止目錄遍歷 (Path Traversal)。
    - 支援於 `config.yaml` 中配置 `ssl_cert` 與 `ssl_key` 啟用 HTTPS / WSS 加密傳輸。

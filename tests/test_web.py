@@ -107,17 +107,41 @@ def test_web_terminal_websocket(web_test_client):
         assert "test_term" in output
 
 
+def test_web_mcp_servers(web_test_client):
+    res = web_test_client.get("/api/mcp", headers={"Authorization": "Bearer secret123"})
+    assert res.status_code == 200
+    data = res.json()
+    assert "mcp_servers" in data
+    assert "total" in data
+
+
+def test_web_compact_session(web_test_client):
+    # 1. Create session
+    create_res = web_test_client.post(
+        "/api/sessions",
+        headers={"Authorization": "Bearer secret123"},
+        json={"mode": "agent"},
+    )
+    sess_id = create_res.json()["session_id"]
+
+    # 2. Compact session
+    compact_res = web_test_client.post(
+        f"/api/sessions/{sess_id}/compact?ratio=0.50",
+        headers={"Authorization": "Bearer secret123"},
+    )
+    assert compact_res.status_code == 200
+    data = compact_res.json()
+    assert data["status"] == "compacted"
+    assert "result" in data
 def test_web_agent_websocket_approval(web_test_client):
     with web_test_client.websocket_connect("/ws/agent?token=secret123") as ws:
-        # Send query with auto_approve = False
         ws.send_json({
             "action": "query",
             "prompt": "hi",
             "auto_approve": False,
         })
-        # Verify websocket communicates
         first_event = ws.receive_json()
         assert "type" in first_event
-        # Send cancel
         ws.send_json({"action": "cancel"})
+
 
