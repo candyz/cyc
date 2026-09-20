@@ -213,6 +213,22 @@ def test_parse_args_completion():
         assert args.completion == "zsh"
 
 
+def test_parse_args_bot():
+    with patch.object(sys, "argv", ["cyc", "--bot", "--bot-token", "test_tok"]):
+        args = parse_args()
+        assert args.bot is True
+        assert args.bot_token == "test_tok"
+
+
+@pytest.mark.asyncio
+async def test_async_main_bot_command():
+    with patch.object(sys, "argv", ["cyc", "bot", "--bot-token", "dummy_token"]):
+        with patch("cyc.bot.service.TelegramBotService.start", new_callable=AsyncMock) as mock_start:
+            await async_main()
+            assert mock_start.called
+
+
+
 @pytest.mark.asyncio
 async def test_async_main_completion(capsys):
     with patch.object(sys, "argv", ["cyc", "--completion", "bash"]):

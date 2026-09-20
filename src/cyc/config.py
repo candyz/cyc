@@ -56,6 +56,18 @@ class WebConfig(BaseModel):
     ssl_key: Optional[str] = None
     enable_terminal: bool = True
 
+class TelegramConfig(BaseModel):
+    token: str = ""
+    allowed_user_ids: List[int] = Field(default_factory=list)
+    workspace_path: Optional[str] = None
+    streaming_throttle_seconds: float = 1.2
+    auto_approve: bool = False
+
+class BotConfig(BaseModel):
+    enabled: bool = False
+    platform: str = "telegram"  # "telegram", "discord", "slack"
+    telegram: TelegramConfig = Field(default_factory=TelegramConfig)
+
 class Config(BaseModel):
     default_provider: str = "ollama"
     default_model: str = ""
@@ -65,6 +77,7 @@ class Config(BaseModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     ui: UIConfig = Field(default_factory=UIConfig)
     web: WebConfig = Field(default_factory=WebConfig)
+    bot: BotConfig = Field(default_factory=BotConfig)
 
     def get_provider(self, name: Optional[str] = None) -> ProviderConfig:
         provider_name = name or self.default_provider
@@ -134,9 +147,21 @@ DEFAULT_CONFIG_DICT = {
         "ssl_key": None,
         "enable_terminal": True,
     },
+    "bot": {
+        "enabled": False,
+        "platform": "telegram",
+        "telegram": {
+            "token": "",
+            "allowed_user_ids": [],
+            "workspace_path": None,
+            "streaming_throttle_seconds": 1.2,
+            "auto_approve": False,
+        },
+    },
 }
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "cyc" / "config.yaml"
+
 
 def load_config(config_path: Optional[Path] = None) -> Config:
     path = config_path or DEFAULT_CONFIG_PATH
@@ -251,6 +276,17 @@ web:
   cors_origins:
     - "*"
   enable_terminal: true           # Enable embedded xterm terminal
+
+# Chatbot Gateway configuration (Telegram, Discord, Slack)
+bot:
+  enabled: false
+  platform: "telegram"               # telegram | discord | slack
+  telegram:
+    token: "${TELEGRAM_BOT_TOKEN}"    # Bot token from @BotFather
+    allowed_user_ids: []              # Whitelisted Telegram user IDs (e.g. [123456789])
+    workspace_path: null              # Default workspace path (null = current working directory)
+    streaming_throttle_seconds: 1.2  # Interval between message updates to prevent 429
+    auto_approve: false              # Auto-approve mutation tools without interactive inline buttons
 """
 
 def init_config_file(dest_path: Optional[Path] = None, force: bool = False) -> Path:

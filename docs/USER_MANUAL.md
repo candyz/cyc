@@ -302,4 +302,47 @@ cyc web --token my-secret-token --no-open
    - 工作區路徑檢查，嚴格防止目錄遍歷 (Path Traversal)。
    - 支援於 `config.yaml` 中配置 `ssl_cert` 與 `ssl_key` 啟用 HTTPS / WSS 加密傳輸。
 
+---
 
+## 8. 🤖 Telegram 通訊軟體閘道 (Chatbot Gateway)
+
+`cyc` 內建 Telegram Bot 閘道服務，讓您隨時在外透過手機 Telegram 即可遠端操控主機上的 `cyc` 執行編程、巡檢或會話互動。
+
+### 8.1 設定方式 (`~/.config/cyc/config.yaml`)
+```yaml
+bot:
+  enabled: true
+  platform: "telegram"
+  telegram:
+    token: "${TELEGRAM_BOT_TOKEN}"    # 從 @BotFather 取得之 Bot Token
+    allowed_user_ids:                # 允許控制的使用者 Telegram ID 白名單（避免惡意未授權調用）
+      - 123456789
+    workspace_path: "~/Projects/my-app" # 指定遠端工作目錄（預設為啟動當前目錄）
+    streaming_throttle_seconds: 1.2  # 訊息更新節流間隔（避免觸發 Telegram 429 限制）
+    auto_approve: false              # 是否免確認自動放行變更工具
+```
+
+### 8.2 啟動 Bot 服務
+```bash
+# 基本啟動（讀取 config.yaml）
+cyc bot
+
+# 亦可使用命令列旗標指定 Token
+cyc bot --bot-token "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+```
+
+### 8.3 支援指令與特色
+1. **白名單安全存取驗證**：嚴格阻絕未授權之第三方帳號，僅允許白名單 `allowed_user_ids` 發起對話。
+2. **HITL 視覺化審批按鈕 (Inline Keyboard)**：
+   - 當 Agent 欲執行 `write_file`, `replace_file_content` 或 `run_command` 時，Bot 會傳送包含參數摘要與 Unified Diff 預覽的卡片。
+   - 附帶 `[ ✅ Approve ]` 與 `[ ❌ Deny ]` 內嵌按鈕，手機一鍵點擊即可核准或阻擋工具執行。
+3. **防 Rate Limit 節流串流與智慧長訊息分割**：
+   - 生成過程依設定間隔平滑編輯訊息 Bubble，不觸發 Telegram API 限額。
+   - 超長程式碼輸出自動切割為多則訊息，並確保 Markdown 標籤修復不破版。
+4. **專屬 Telegram 指令集**：
+   - `/start`：顯示歡迎介面、工作目錄與功能清單。
+   - `/mode <agent|chat>`：即時切換自主 Agent 迴圈或純交談 Chat 模式。
+   - `/status`：查看當前工作目錄、會話 ID、歷史訊息數與審批模式。
+   - `/undo`：回退上一輪會話歷程。
+   - `/stop`：緊急中斷正在背景執行的 Agent 任務。
+   - `/clear`：清空當前會話歷史。

@@ -907,6 +907,8 @@ def parse_args():
     parser.add_argument("--host", type=str, default=None, help="Host address to bind for Web interface (default: 127.0.0.1)")
     parser.add_argument("--token", type=str, default=None, help="Authentication token for Web interface")
     parser.add_argument("--no-open", action="store_true", help="Do not automatically open the browser when starting Web interface")
+    parser.add_argument("--bot", action="store_true", help="Launch the cyc Chatbot Gateway (e.g. Telegram)")
+    parser.add_argument("--bot-token", type=str, default=None, help="Bot API token (overrides config)")
     return parser.parse_args()
 
 async def async_main():
@@ -965,6 +967,14 @@ async def async_main():
             open_browser=not args.no_open,
             workspace_path=Path.cwd(),
         )
+        return
+
+    # Handle 'cyc bot' or 'cyc --bot'
+    is_bot_cmd = args.bot or (len(args.prompt) >= 1 and args.prompt[0].lower() == "bot")
+    if is_bot_cmd:
+        from cyc.bot.service import TelegramBotService
+        bot_service = TelegramBotService(config=config, token=args.bot_token)
+        await bot_service.start()
         return
 
     # Handle '--resume'
