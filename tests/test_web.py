@@ -78,6 +78,19 @@ def test_web_sessions_list_and_create(web_test_client):
     assert get_res.status_code == 200
     assert get_res.json()["session_id"] == sess_id
 
+    # Rename session via API
+    rename_res = web_test_client.post(
+        f"/api/sessions/{sess_id}/rename",
+        json={"title": "Renamed Web Session"},
+        headers={"Authorization": "Bearer secret123"},
+    )
+    assert rename_res.status_code == 200
+    assert rename_res.json()["title"] == "Renamed Web Session"
+
+    # Verify updated session detail
+    get_res2 = web_test_client.get(f"/api/sessions/{sess_id}", headers={"Authorization": "Bearer secret123"})
+    assert get_res2.json()["title"] == "Renamed Web Session"
+
 
 def test_web_file_browsing(web_test_client, tmp_path):
     test_file = tmp_path / "sample.py"

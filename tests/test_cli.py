@@ -280,6 +280,24 @@ async def test_slash_command_sessions_and_resume():
     assert handled is True
     assert len(app.session.messages) == 2
 
+    # Test /rename current session
+    handled = await app.handle_slash_command("/rename My Great Analysis")
+    assert handled is True
+    assert app.session.title == "My Great Analysis"
+
+    # Test get_known_sessions and get_known_session_items include title and metadata
+    known = app.get_known_sessions("cyc")
+    assert "My Great Analysis" in known
+    items = app.get_known_session_items("cyc")
+    item_titles = [it.get("title") for it in items]
+    assert "My Great Analysis" in item_titles
+
+    # Test /resume by title
+    handled = await app.handle_slash_command("/resume My Great Analysis")
+    assert handled is True
+    assert app.session.session_id == sess_id
+    assert app.session.title == "My Great Analysis"
+
 
 @pytest.mark.asyncio
 async def test_slash_command_undo():

@@ -31,7 +31,7 @@
   <header class="bg-zinc-900 border-b border-zinc-800 px-4 py-2.5 flex items-center justify-between shrink-0">
     <div class="flex items-center space-x-3">
       <span class="font-extrabold text-xl tracking-wider text-emerald-400">cyc</span>
-      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v1.0.2</span>
+      <span class="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded" id="appVersion">v1.1.0</span>
       <div class="hidden sm:flex items-center space-x-2 text-xs text-zinc-400 border-l border-zinc-700 pl-3">
         <span>Workspace:</span>
         <span class="text-zinc-200 font-mono" id="wsName">loading...</span>
@@ -621,15 +621,35 @@
         const data = await res.json();
         sessionList.innerHTML = '';
         data.sessions.forEach(s => {
+          const sid = s.session_id || s.id;
+          const displayTitle = s.title ? s.title : (s.preview || sid);
           const item = document.createElement('div');
-          item.className = 'p-2 rounded hover:bg-zinc-800 cursor-pointer text-zinc-300 truncate transition flex justify-between items-center';
+          item.className = 'group p-2 rounded hover:bg-zinc-800 cursor-pointer text-zinc-300 truncate transition flex justify-between items-center';
           item.innerHTML = `
-            <div class="truncate flex-1">
-              <div class="font-medium text-zinc-200 truncate">${s.preview || s.session_id}</div>
-              <div class="text-[10px] text-zinc-500">${s.mode || 'agent'} · ${s.provider || 'local'}</div>
+            <div class="truncate flex-1 pr-2">
+              <div class="font-medium text-zinc-200 truncate" title="${sid}">${displayTitle}</div>
+              <div class="text-[10px] text-zinc-500">${s.mode || 'agent'} · ${s.provider || 'local'}${s.title && s.preview ? ' · ' + s.preview : ''}</div>
             </div>
+            <button class="opacity-0 group-hover:opacity-100 p-1 hover:text-emerald-400 text-zinc-500 text-xs transition" title="Rename Session">✏️</button>
           `;
-          item.onclick = () => loadSessionDetail(s.session_id);
+          const renameBtn = item.querySelector('button');
+          renameBtn.onclick = async (ev) => {
+            ev.stopPropagation();
+            const newTitle = prompt('Enter new session title:', s.title || '');
+            if (newTitle !== null && newTitle.trim()) {
+              try {
+                await fetch(`/api/sessions/${encodeURIComponent(sid)}/rename`, {
+                  method: 'POST',
+                  headers: getHeaders(),
+                  body: JSON.stringify({ title: newTitle.trim() }),
+                });
+                loadSessions();
+              } catch (err) {
+                console.error('Failed to rename session', err);
+              }
+            }
+          };
+          item.onclick = () => loadSessionDetail(sid);
           sessionList.appendChild(item);
         });
       } catch (e) {

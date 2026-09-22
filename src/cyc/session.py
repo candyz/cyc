@@ -53,11 +53,13 @@ class SessionManager:
         mode: Optional[str] = None,
         compact_threshold: float = 0.80,
         sessions_dir: Optional[Path] = None,
+        title: Optional[str] = None,
     ):
         self.system_prompt = system_prompt
         self.provider = provider
         self.model = model
         self.mode = mode
+        self.title = title or ""
         self.compact_threshold = compact_threshold
         if max_context_tokens is not None and max_context_tokens > 0:
             self.max_context_tokens = max_context_tokens
@@ -111,6 +113,10 @@ class SessionManager:
         self.append_event("user_message", {"content": content})
         self.total_prompt_tokens += estimate_tokens(content)
         self.updated_at = time.time()
+        # Auto-set title from first user query if not set
+        if not self.title and content.strip():
+            first_line = content.strip().splitlines()[0].strip()
+            self.title = first_line[:40] + ("..." if len(first_line) > 40 else "")
         self._prune_context_if_needed()
         self.auto_save()
 
@@ -137,6 +143,14 @@ class SessionManager:
         self._prune_context_if_needed()
         self.auto_save()
 
+    def rename(self, new_title: str) -> None:
+        """Rename this session with a user-friendly title."""
+        self.title = new_title.strip()
+        self.updated_at = time.time()
+        self.append_event("session_renamed", {"title": self.title})
+        target_file = self.sessions_dir / f"{self.session_id}.json"
+        self.save_json(target_file)
+
     def fork_session(self, new_id: Optional[str] = None) -> "SessionManager":
         """Fork this session into a new independent session branch with identical history."""
         import copy
@@ -150,6 +164,7 @@ class SessionManager:
             mode=self.mode,
             compact_threshold=self.compact_threshold,
             sessions_dir=self.sessions_dir,
+            title=f"{self.title} (fork)" if self.title else "",
         )
         forked.messages = copy.deepcopy(self.messages)
         forked.history_checkpoints = copy.deepcopy(self.history_checkpoints)
@@ -324,6 +339,7 @@ class SessionManager:
     def to_dict(self) -> Dict:
         return {
             "session_id": self.session_id,
+            "title": self.title,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "provider": self.provider,
@@ -351,6 +367,7 @@ class SessionManager:
             mode=data.get("mode"),
             compact_threshold=data.get("compact_threshold", 0.80),
             sessions_dir=sessions_dir,
+            title=data.get("title", ""),
         )
         manager.created_at = data.get("created_at", time.time())
         manager.updated_at = data.get("updated_at", manager.created_at)
@@ -369,7 +386,7 @@ class SessionManager:
     def auto_save(self) -> None:
         """Automatically persist active session to sessions_dir."""
         try:
-            if not self.messages and not self.system_prompt:
+            if not self.messages and not self.system_prompt and not self.title:
                 return
             target_file = self.sessions_dir / f"{self.session_id}.json"
             self.save_json(target_file)
@@ -383,7 +400,8 @@ class SessionManager:
         return cls.from_dict(data, sessions_dir=sessions_dir)
 
     def save_markdown(self, path: Path) -> None:
-        lines: List[str] = [f"# Chat Session: {self.session_id}\n\n"]
+        header_title = f"{self.title} ({self.session_id})" if self.title else self.session_id
+        lines: List[str] = [f"# Chat Session: {header_title}\n\n"]
         if self.provider or self.model:
             lines.append(f"> **Provider**: {self.provider or 'N/A'} | **Model**: {self.model or 'N/A'} | **Mode**: {self.mode or 'N/A'}\n\n")
         if self.system_prompt:
@@ -418,6 +436,7 @@ class SessionManager:
                 results.append({
                     "id": data.get("session_id", file.stem),
                     "session_id": data.get("session_id", file.stem),
+                    "title": data.get("title", ""),
                     "agent": "cyc",
                     "created_at": data.get("created_at", file.stat().st_mtime),
                     "updated_at": data.get("updated_at", file.stat().st_mtime),
@@ -458,10 +477,22 @@ class SessionManager:
         if exact_file.exists():
             return cls.load_json(exact_file, sessions_dir=sessions_dir)
 
-        # Match prefix of session_id
-        for s in cls.list_sessions(sessions_dir=sessions_dir):
+        # Match exact or prefix of session_id, or match title
+        all_sessions = cls.list_sessions(sessions_dir=sessions_dir)
+        # 1. Exact title match
+        for s in all_sessions:
+            if s.get("title") and s["title"].strip().lower() == query.strip().lower():
+                return cls.load_json(s["file_path"], sessions_dir=sessions_dir)
+
+        # 2. Prefix of session_id
+        for s in all_sessions:
             sid = s.get("id") or s.get("session_id", "")
             if sid.startswith(query):
+                return cls.load_json(s["file_path"], sessions_dir=sessions_dir)
+
+        # 3. Partial / substring title match
+        for s in all_sessions:
+            if s.get("title") and query.strip().lower() in s["title"].strip().lower():
                 return cls.load_json(s["file_path"], sessions_dir=sessions_dir)
 
         return None

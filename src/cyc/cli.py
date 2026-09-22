@@ -4,7 +4,7 @@ from contextlib import contextmanager
 import shutil
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
@@ -143,39 +143,91 @@ class CliApp:
         return list(self.config.providers.keys())
 
     def get_known_sessions(self, agent: Optional[str] = None) -> List[str]:
-        """Collect known session IDs for tab completion, optionally filtered by agent."""
-        session_ids = []
+        """Collect known session IDs and aliases for tab completion, optionally filtered by agent."""
+        items = self.get_known_session_items(agent)
+        res = []
+        for item in items:
+            res.append(item["id"])
+            if item.get("title") and item["title"] not in res:
+                res.append(item["title"])
+        return res
+
+    def get_known_session_items(self, agent: Optional[str] = None) -> List[Dict]:
+        """Collect rich session metadata dicts (id, title, preview, msgs, updated_at, agent) for tab completion."""
+        items: List[Dict] = []
         try:
             filter_agent = agent.lower() if agent else None
             if not filter_agent or filter_agent in ("all", "cyc"):
-                session_ids.append("LATEST")
+                items.append({
+                    "id": "LATEST",
+                    "title": "Latest Cyc Session",
+                    "preview": "Resume most recent Cyc conversation",
+                    "message_count": 0,
+                    "updated_at": 0,
+                    "agent": "cyc",
+                })
                 for s in SessionManager.list_sessions():
                     sid = s.get("id") or s.get("session_id")
                     if sid:
-                        session_ids.append(sid)
+                        items.append({
+                            "id": sid,
+                            "title": s.get("title", ""),
+                            "preview": s.get("preview", ""),
+                            "message_count": s.get("message_count", 0),
+                            "updated_at": s.get("updated_at", 0),
+                            "agent": "cyc",
+                        })
             if not filter_agent or filter_agent in ("all", "agy"):
                 for s in SessionAdapters.list_agy_sessions():
                     sid = s.get("id") or s.get("session_id")
                     if sid:
-                        session_ids.append(sid)
+                        items.append({
+                            "id": sid,
+                            "title": s.get("title", ""),
+                            "preview": s.get("preview", ""),
+                            "message_count": s.get("message_count", 0),
+                            "updated_at": s.get("updated_at", 0),
+                            "agent": "agy",
+                        })
             if not filter_agent or filter_agent in ("all", "claude"):
                 for s in SessionAdapters.list_claude_sessions():
                     sid = s.get("id") or s.get("session_id")
                     if sid:
-                        session_ids.append(sid)
+                        items.append({
+                            "id": sid,
+                            "title": s.get("title", ""),
+                            "preview": s.get("preview", ""),
+                            "message_count": s.get("message_count", 0),
+                            "updated_at": s.get("updated_at", 0),
+                            "agent": "claude",
+                        })
             if not filter_agent or filter_agent in ("all", "pi"):
                 for s in SessionAdapters.list_pi_sessions():
                     sid = s.get("id") or s.get("session_id")
                     if sid:
-                        session_ids.append(sid)
+                        items.append({
+                            "id": sid,
+                            "title": s.get("title", ""),
+                            "preview": s.get("preview", ""),
+                            "message_count": s.get("message_count", 0),
+                            "updated_at": s.get("updated_at", 0),
+                            "agent": "pi",
+                        })
             if not filter_agent or filter_agent in ("all", "opencode"):
                 for s in SessionAdapters.list_opencode_sessions():
                     sid = s.get("id") or s.get("session_id")
                     if sid:
-                        session_ids.append(sid)
+                        items.append({
+                            "id": sid,
+                            "title": s.get("title", ""),
+                            "preview": s.get("preview", ""),
+                            "message_count": s.get("message_count", 0),
+                            "updated_at": s.get("updated_at", 0),
+                            "agent": "opencode",
+                        })
         except Exception:
             pass
-        return session_ids
+        return items
 
     async def update_cached_models(self) -> None:
         try:
@@ -298,7 +350,8 @@ class CliApp:
   /skill <name>               Apply a specialized skill to agent instructions
   /trust <action>             Check or change current workspace trust status (show/allow/deny)
   /sessions <source>          List all saved chat & agent sessions (all, cyc, agy, etc.)
-  /resume <id>                Resume a previous session (or latest if omitted)
+  /resume <id|title>          Resume a previous session (or latest if omitted)
+  /rename <title>             Rename current session with a descriptive title
   /fork <id>                  Fork current session into a new branch
   /sync <agent>               Sync session back to external agent (e.g. /sync agy)
   /models                     List available models for the active provider
@@ -490,6 +543,27 @@ class CliApp:
                         console.print(f"[yellow]Unknown loop parameter: '{token}'. Options: standard, plan, minimal, or an integer turns limit.[/yellow]")
                 if not changed_something:
                     console.print("[yellow]Usage: /loop [strategy] [max_turns] (e.g. /loop 100, /loop plan 50)[/yellow]")
+            return True
+        elif action == "/rename":
+            if not arg:
+                curr_title = self.session.title or "(none)"
+                console.print(f"Current session title: [bold cyan]{curr_title}[/bold cyan]")
+                console.print("[dim]Usage: /rename <new_title> (or /rename <session_id> <new_title>)[/dim]")
+            else:
+                parts = arg.split(maxsplit=1)
+                # Check if user specified a session ID or title for another session
+                if len(parts) == 2 and (parts[0] in [s.get("id") for s in SessionManager.list_sessions()] or (self.session.sessions_dir / f"{parts[0]}.json").exists()):
+                    target_id = parts[0]
+                    new_title = parts[1]
+                    target_sess = SessionManager.find_session(target_id)
+                    if target_sess:
+                        target_sess.rename(new_title)
+                        console.print(f"[bold green]✓ Session {target_id} renamed to:[/bold green] [bold cyan]{new_title}[/bold cyan]")
+                    else:
+                        console.print(f"[bold red]Session not found:[/bold red] {target_id}")
+                else:
+                    self.session.rename(arg)
+                    console.print(f"[bold green]✓ Current session renamed to:[/bold green] [bold cyan]{self.session.title}[/bold cyan]")
             return True
         elif action == "/fork":
             forked_session = self.session.fork_session(new_id=arg if arg else None)

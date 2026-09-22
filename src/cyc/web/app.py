@@ -60,6 +60,11 @@ class SessionCreateRequest(BaseModel):
     model: Optional[str] = None
     mode: Optional[str] = "agent"
     system_prompt: Optional[str] = None
+    title: Optional[str] = None
+
+
+class SessionRenameRequest(BaseModel):
+    title: str
 
 
 def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None, workspace_path: Optional[Path] = None) -> FastAPI:
@@ -224,9 +229,18 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
             model=mod,
             mode=req.mode or "agent",
             system_prompt=req.system_prompt,
+            title=req.title,
         )
         session.save_json(session.sessions_dir / f"{session.session_id}.json")
         return session.to_dict()
+
+    @app.post("/api/sessions/{session_id}/rename")
+    async def rename_session(session_id: str, req: SessionRenameRequest):
+        session = SessionManager.find_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        session.rename(req.title)
+        return {"status": "renamed", "session_id": session.session_id, "title": session.title}
 
     @app.delete("/api/sessions/{session_id}")
     async def delete_session(session_id: str):

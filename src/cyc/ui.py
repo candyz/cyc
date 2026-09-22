@@ -51,6 +51,7 @@ class CommandCompleter(Completer):
             "/trust",
             "/sessions",
             "/resume",
+            "/rename",
             "/fork",
             "/sync",
             "/models",
@@ -69,7 +70,7 @@ class CommandCompleter(Completer):
             "/quit",
         ]
 
-    def get_sessions(self, agent: Optional[str] = None) -> List[str]:
+    def get_sessions(self, agent: Optional[str] = None) -> List[Any]:
         if not self._get_sessions_fn:
             return []
         import inspect
@@ -139,23 +140,56 @@ class CommandCompleter(Completer):
                 resume_parts = arg_prefix.split(maxsplit=1)
                 agent_names = ["cyc", "agy", "claude", "pi", "opencode"]
 
+                def _format_item_meta(item: Any) -> str:
+                    if not isinstance(item, dict):
+                        return ""
+                    title = item.get("title", "")
+                    preview = item.get("preview", "")
+                    msgs = item.get("message_count", 0)
+                    parts = []
+                    if title:
+                        parts.append(title)
+                    elif preview:
+                        parts.append(preview[:40])
+                    if msgs:
+                        parts.append(f"{msgs} msgs")
+                    return f" · ".join(parts) if parts else ""
+
+                def _yield_session_completions(items: List[Any], query: str):
+                    query_lower = query.lower()
+                    seen = set()
+                    for it in items:
+                        if isinstance(it, dict):
+                            sid = it.get("id") or it.get("session_id", "")
+                            title = it.get("title", "")
+                            meta = _format_item_meta(it)
+                            # 1. Match session id
+                            if sid and sid.lower().startswith(query_lower) and sid not in seen:
+                                seen.add(sid)
+                                yield Completion(sid, start_position=-len(query), display_meta=meta)
+                            # 2. Match session title as alias
+                            if title and title.lower().startswith(query_lower) and title not in seen:
+                                seen.add(title)
+                                yield Completion(title, start_position=-len(query), display_meta=f"[ID: {sid[:12]}] {meta}")
+                        elif isinstance(it, str):
+                            if it.lower().startswith(query_lower) and it not in seen:
+                                seen.add(it)
+                                yield Completion(it, start_position=-len(query))
+
                 if not resume_parts:
                     # User typed "/resume " with no text yet
                     for an in agent_names:
-                        yield Completion(an, start_position=0)
-                    for s in self.get_sessions(None):
-                        yield Completion(s, start_position=0)
+                        yield Completion(an, start_position=0, display_meta="Filter agent sessions")
+                    yield from _yield_session_completions(self.get_sessions(None), "")
                 elif len(resume_parts) == 1 and not arg_prefix.endswith(" "):
                     # Still typing the first argument: could be an agent name or a session ID / LATEST
                     first_tok = resume_parts[0].lower()
                     # First yield matching agent names
                     for an in agent_names:
                         if an.startswith(first_tok):
-                            yield Completion(an, start_position=-len(first_tok))
+                            yield Completion(an, start_position=-len(first_tok), display_meta="Filter agent sessions")
                     # Also yield matching session IDs directly
-                    for s in self.get_sessions(None):
-                        if s.lower().startswith(first_tok):
-                            yield Completion(s, start_position=-len(first_tok))
+                    yield from _yield_session_completions(self.get_sessions(None), first_tok)
                 else:
                     # User specified first argument and pressed space, or is typing session id for that agent
                     target_agent = resume_parts[0].lower()
@@ -163,14 +197,10 @@ class CommandCompleter(Completer):
 
                     if target_agent in agent_names:
                         filter_agent = None if target_agent == "all" else target_agent
-                        for s in self.get_sessions(filter_agent):
-                            if s.lower().startswith(session_query.lower()):
-                                yield Completion(s, start_position=-len(session_query))
+                        yield from _yield_session_completions(self.get_sessions(filter_agent), session_query)
                     else:
                         # First argument was not a recognized agent name, fallback to all sessions
-                        for s in self.get_sessions(None):
-                            if s.lower().startswith(arg_prefix.lower()):
-                                yield Completion(s, start_position=-len(arg_prefix))
+                        yield from _yield_session_completions(self.get_sessions(None), arg_prefix)
         elif cmd in ("/save", "/load"):
             # Delegate to PathCompleter with modified document
             sub_doc = Document(arg_prefix, cursor_position=len(arg_prefix))
@@ -247,11 +277,12 @@ class TerminalUI:
         table = Table(title=f"Chat & Agent Sessions ({len(sessions)})", box=ROUNDED)
         table.add_column("Agent / Source", style="bold yellow", justify="center")
         table.add_column("Session ID", style="bold cyan")
+        table.add_column("Title / Name", style="bold white", max_width=25, overflow="ellipsis")
         table.add_column("Mode", justify="center")
         table.add_column("Provider / Model", style="green")
         table.add_column("Msgs", justify="right")
         table.add_column("Last Updated", style="dim")
-        table.add_column("Latest Preview", style="dim", max_width=40, overflow="ellipsis")
+        table.add_column("Latest Preview", style="dim", max_width=35, overflow="ellipsis")
 
         import datetime
         for s in sessions:
@@ -272,9 +303,11 @@ class TerminalUI:
             else:
                 agent_col = "[bold green]CYC[/bold green]"
 
+            title_text = s.get("title") or "-"
             table.add_row(
                 agent_col,
                 s["session_id"] if "session_id" in s else s.get("id", "-"),
+                title_text,
                 mode_badge,
                 prov_model,
                 str(s.get("message_count", 0)),

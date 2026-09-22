@@ -83,10 +83,18 @@ def test_session_auto_save_and_resume(tmp_path: Path):
     saved_file = sessions_dir / "test_sess_01.json"
     assert saved_file.exists()
 
+    # Check auto-title was assigned from first user prompt
+    assert session1.title == "First user prompt"
+
+    # Test rename
+    session1.rename("Weather Analysis")
+    assert session1.title == "Weather Analysis"
+
     # Test list_sessions
     all_sessions = SessionManager.list_sessions(sessions_dir=sessions_dir)
     assert len(all_sessions) == 1
     assert all_sessions[0]["session_id"] == "test_sess_01"
+    assert all_sessions[0]["title"] == "Weather Analysis"
     assert all_sessions[0]["mode"] == "agent"
     assert all_sessions[0]["message_count"] == 2
 
@@ -94,12 +102,23 @@ def test_session_auto_save_and_resume(tmp_path: Path):
     latest = SessionManager.get_latest_session(sessions_dir=sessions_dir)
     assert latest is not None
     assert latest.session_id == "test_sess_01"
+    assert latest.title == "Weather Analysis"
     assert len(latest.messages) == 2
 
     # Test find_session by prefix
     found = SessionManager.find_session("test_sess", sessions_dir=sessions_dir)
     assert found is not None
     assert found.session_id == "test_sess_01"
+
+    # Test find_session by title
+    found_by_title = SessionManager.find_session("Weather Analysis", sessions_dir=sessions_dir)
+    assert found_by_title is not None
+    assert found_by_title.session_id == "test_sess_01"
+
+    # Test find_session by partial title
+    found_by_partial = SessionManager.find_session("weather", sessions_dir=sessions_dir)
+    assert found_by_partial is not None
+    assert found_by_partial.session_id == "test_sess_01"
 
 def test_session_undo():
     session = SessionManager()
