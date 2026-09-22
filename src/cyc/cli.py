@@ -150,19 +150,29 @@ class CliApp:
             if not filter_agent or filter_agent in ("all", "cyc"):
                 session_ids.append("LATEST")
                 for s in SessionManager.list_sessions():
-                    session_ids.append(s["id"])
+                    sid = s.get("id") or s.get("session_id")
+                    if sid:
+                        session_ids.append(sid)
             if not filter_agent or filter_agent in ("all", "agy"):
                 for s in SessionAdapters.list_agy_sessions():
-                    session_ids.append(s["id"])
+                    sid = s.get("id") or s.get("session_id")
+                    if sid:
+                        session_ids.append(sid)
             if not filter_agent or filter_agent in ("all", "claude"):
                 for s in SessionAdapters.list_claude_sessions():
-                    session_ids.append(s["id"])
+                    sid = s.get("id") or s.get("session_id")
+                    if sid:
+                        session_ids.append(sid)
             if not filter_agent or filter_agent in ("all", "pi"):
                 for s in SessionAdapters.list_pi_sessions():
-                    session_ids.append(s["id"])
+                    sid = s.get("id") or s.get("session_id")
+                    if sid:
+                        session_ids.append(sid)
             if not filter_agent or filter_agent in ("all", "opencode"):
                 for s in SessionAdapters.list_opencode_sessions():
-                    session_ids.append(s["id"])
+                    sid = s.get("id") or s.get("session_id")
+                    if sid:
+                        session_ids.append(sid)
         except Exception:
             pass
         return session_ids

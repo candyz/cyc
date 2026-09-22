@@ -260,7 +260,23 @@ async def test_slash_command_sessions_and_resume():
     app.session.auto_save()
     sess_id = app.session.session_id
 
+    # Verify get_known_sessions finds the session id
+    known = app.get_known_sessions("cyc")
+    assert "LATEST" in known
+    assert sess_id in known
+
+    # Test /resume with session id directly
     handled = await app.handle_slash_command(f"/resume {sess_id}")
+    assert handled is True
+    assert len(app.session.messages) == 2
+
+    # Test /resume with explicit agent prefix 'cyc <sess_id>'
+    handled = await app.handle_slash_command(f"/resume cyc {sess_id}")
+    assert handled is True
+    assert len(app.session.messages) == 2
+
+    # Test /resume cyc LATEST
+    handled = await app.handle_slash_command("/resume cyc LATEST")
     assert handled is True
     assert len(app.session.messages) == 2
 

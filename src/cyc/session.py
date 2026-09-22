@@ -416,7 +416,9 @@ class SessionManager:
                             preview = preview[:57] + "..."
                         break
                 results.append({
+                    "id": data.get("session_id", file.stem),
                     "session_id": data.get("session_id", file.stem),
+                    "agent": "cyc",
                     "created_at": data.get("created_at", file.stat().st_mtime),
                     "updated_at": data.get("updated_at", file.stat().st_mtime),
                     "provider": data.get("provider", ""),
@@ -442,6 +444,9 @@ class SessionManager:
 
     @classmethod
     def find_session(cls, query: str, sessions_dir: Optional[Path] = None) -> Optional["SessionManager"]:
+        if query == "LATEST":
+            return cls.get_latest_session(sessions_dir=sessions_dir)
+
         target_dir = sessions_dir or DEFAULT_SESSIONS_DIR
         # Direct filename or path
         direct_path = Path(query).expanduser()
@@ -455,7 +460,8 @@ class SessionManager:
 
         # Match prefix of session_id
         for s in cls.list_sessions(sessions_dir=sessions_dir):
-            if s["session_id"].startswith(query):
+            sid = s.get("id") or s.get("session_id", "")
+            if sid.startswith(query):
                 return cls.load_json(s["file_path"], sessions_dir=sessions_dir)
 
         return None
