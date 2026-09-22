@@ -87,6 +87,10 @@ cyc -r                                                           # 開啟互動�
 # 4. 單次問答 / Pipeline 模式
 cyc "請檢查專案中的單元測試覆蓋率"
 cat main.py | cyc "請為這段代碼編寫型別註解"
+
+# 5. 一鍵檢查更新並自動升級 (如同 pi update / agy update / claude update)
+cyc update                                                       # 檢查新版本並自動安裝升級
+cyc update --force                                               # 強制重新安裝最新版
 ```
 
 ---
@@ -137,6 +141,7 @@ cat main.py | cyc "請為這段代碼編寫型別註解"
 | `/save <filepath>` | 儲存會話（`.md` 存為 Markdown，`.json` 存為結構化會話） |
 | `/load <filepath>` | 載入 JSON 會話檔案並接續對話 |
 | `/undo` | 回退上一輪對話，並可選擇復原工作區未提交的檔案修改 |
+| `/update [force]` | 檢查遠端 GitHub 版本並自動執行一鍵在線更新升級 |
 | `/clear` | 清空當前對話歷史 |
 | `/exit` 或 `/quit` | 退出對話終端 |
 

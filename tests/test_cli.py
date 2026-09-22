@@ -433,6 +433,38 @@ async def test_quick_chat_shortcuts():
     app.stream_direct_chat.assert_awaited_with("Explain photosynthesis")
 
 
+@pytest.mark.asyncio
+async def test_update_command_and_slash():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+
+    # Test /update slash command
+    with patch("cyc.updater.perform_update", new_callable=AsyncMock) as mock_update:
+        mock_update.return_value = True
+        handled = await app.handle_slash_command("/update")
+        assert handled is True
+        mock_update.assert_awaited_with(force=False)
+
+    with patch("cyc.updater.perform_update", new_callable=AsyncMock) as mock_update:
+        mock_update.return_value = True
+        handled = await app.handle_slash_command("/update --force")
+        assert handled is True
+        mock_update.assert_awaited_with(force=True)
+
+    # Test cli argument 'cyc update'
+    with patch.object(sys, "argv", ["cyc", "update"]):
+        with patch("cyc.updater.perform_update", new_callable=AsyncMock) as mock_update:
+            await async_main()
+            mock_update.assert_awaited_with(force=False)
+
+    # Test cli flag 'cyc --update'
+    with patch.object(sys, "argv", ["cyc", "--update", "-f"]):
+        with patch("cyc.updater.perform_update", new_callable=AsyncMock) as mock_update:
+            await async_main()
+            mock_update.assert_awaited_with(force=True)
+
+
+
 
 
 

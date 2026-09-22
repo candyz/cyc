@@ -260,6 +260,7 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `/save <filepath>` | 儲存會話（`.md` 存為 Markdown，`.json` 存為結構化會話） |
 | `/load <filepath>` | 載入 JSON 會話檔案並接續對話 |
 | `/undo` | 回退上一輪對話，並可選擇復原工作區檔案修改 |
+| `/update [force]` | 檢查遠端 GitHub 版本並自動執行在線升級 |
 | `/clear` | 清空當前對話歷史 |
 | `/exit` 或 `/quit` | 退出對話終端 |
 

@@ -377,6 +377,7 @@ class CliApp:
   /save <filepath>            Save current conversation to Markdown (.md) or JSON (.json)
   /load <filepath>            Load previous conversation from a JSON file
   /undo                       Undo last turn's changes and conversation
+  /update [force]             Check for new versions and auto-update cyc
   /clear                      Clear current session history
   /exit or /quit              Exit CLI""")
             return True
@@ -622,6 +623,11 @@ class CliApp:
                 console.print("[dim yellow]Usage: /chat <query> (or prefix prompt with '?') to ask a quick question without invoking tools.[/dim yellow]")
             else:
                 await self.stream_direct_chat(arg)
+            return True
+        elif action == "/update":
+            from cyc.updater import perform_update
+            force_flag = arg.lower() in ("--force", "-f", "force")
+            await perform_update(force=force_flag)
             return True
         elif action == "/mode":
             if not arg:
@@ -1107,6 +1113,7 @@ def parse_args():
     parser.add_argument("--no-open", action="store_true", help="Do not automatically open the browser when starting Web interface")
     parser.add_argument("--bot", action="store_true", help="Launch the cyc Chatbot Gateway (e.g. Telegram)")
     parser.add_argument("--bot-token", type=str, default=None, help="Bot API token (overrides config)")
+    parser.add_argument("--update", action="store_true", help="Check for cyc updates and automatically install the latest version")
     return parser.parse_args()
 
 async def async_main():
@@ -1146,10 +1153,17 @@ async def async_main():
             return
         except FileExistsError as e:
             console.print(f"[bold yellow]{e}[/bold yellow]")
-            return
         except Exception as e:
             console.print(f"[bold red]Failed to create config:[/bold red] {e}")
             return
+
+    # Handle 'cyc update' or 'cyc --update'
+    is_update_cmd = args.update or (len(args.prompt) >= 1 and args.prompt[0].lower() == "update")
+    if is_update_cmd:
+        from cyc.updater import perform_update
+        force_flag = args.force or ("--force" in args.prompt or "-f" in args.prompt)
+        await perform_update(force=force_flag)
+        return
 
     config = load_config(config_path)
 

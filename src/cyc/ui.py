@@ -72,6 +72,7 @@ class CommandCompleter(Completer):
             "/save",
             "/load",
             "/undo",
+            "/update",
             "/clear",
             "/exit",
             "/quit",
