@@ -387,6 +387,13 @@ async def test_slash_command_sessions_subcommands(tmp_path):
     handled = await app.handle_slash_command(f"/sessions delete {app.session.session_id}")
     assert handled is True
 
+    # 5. /sessions manage (interactive)
+    app.ui.interactive_session_picker = AsyncMock(return_value={"action": "resume", "session": {"id": app.session.session_id, "agent": "cyc"}})
+    handled_manage = await app.handle_slash_command("/sessions manage")
+    assert handled_manage is True
+    assert app.ui.interactive_session_picker.called
+
+
 
 
 

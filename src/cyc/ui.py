@@ -317,7 +317,7 @@ class TerminalUI:
             )
         self.console.print(table)
 
-    def interactive_session_picker(self, sessions: List[Dict]) -> Optional[Dict[str, Any]]:
+    async def interactive_session_picker(self, sessions: List[Dict]) -> Optional[Dict[str, Any]]:
         """Interactive session selector with Resume, Rename, and Delete actions.
         Returns a dict e.g. {"action": "resume"|"rename"|"delete", "session": s, "new_title": ...} or None.
         """
@@ -339,13 +339,17 @@ class TerminalUI:
             label = f"[{agent}] {title} ({msgs} msgs) - {sid[:18]}"
             values.append((s, label))
 
-        selected_session = radiolist_dialog(
-            title="Session Manager (Claude Code style)",
-            text="Choose a session using Up/Down arrows and Enter:",
-            values=values,
-            ok_text="Select",
-            cancel_text="Cancel",
-        ).run()
+        try:
+            selected_session = await radiolist_dialog(
+                title="Session Manager (Claude Code style)",
+                text="Choose a session using Up/Down arrows and Enter:",
+                values=values,
+                ok_text="Select",
+                cancel_text="Cancel",
+            ).run_async()
+        except Exception as e:
+            self.console.print(f"[bold red]Interactive session picker error:[/bold red] {e}")
+            return None
 
         if not selected_session:
             return None
@@ -353,35 +357,44 @@ class TerminalUI:
         # Next, ask for action on selected session
         sid = selected_session.get("id") or selected_session.get("session_id", "")
         title = selected_session.get("title") or "(no title)"
-        action = button_dialog(
-            title=f"Manage: {title}",
-            text=f"Session ID: {sid}\nAgent: {selected_session.get('agent', 'cyc')}\nWhat would you like to do?",
-            buttons=[
-                ("Resume", "resume"),
-                ("Rename", "rename"),
-                ("Delete", "delete"),
-                ("Cancel", "cancel"),
-            ],
-        ).run()
+        try:
+            action = await button_dialog(
+                title=f"Manage: {title}",
+                text=f"Session ID: {sid}\nAgent: {selected_session.get('agent', 'cyc')}\nWhat would you like to do?",
+                buttons=[
+                    ("Resume", "resume"),
+                    ("Rename", "rename"),
+                    ("Delete", "delete"),
+                    ("Cancel", "cancel"),
+                ],
+            ).run_async()
+        except Exception:
+            return None
 
         if not action or action == "cancel":
             return None
 
         if action == "rename":
-            new_title = input_dialog(
-                title="Rename Session",
-                text=f"Current title: {title}\nEnter new title:",
-                default=selected_session.get("title", ""),
-            ).run()
+            try:
+                new_title = await input_dialog(
+                    title="Rename Session",
+                    text=f"Current title: {title}\nEnter new title:",
+                    default=selected_session.get("title", ""),
+                ).run_async()
+            except Exception:
+                return None
             if new_title and new_title.strip():
                 return {"action": "rename", "session": selected_session, "new_title": new_title.strip()}
             return None
 
         if action == "delete":
-            confirmed = yes_no_dialog(
-                title="Confirm Delete",
-                text=f"Are you sure you want to delete session '{title}' ({sid})?\nThis action cannot be undone.",
-            ).run()
+            try:
+                confirmed = await yes_no_dialog(
+                    title="Confirm Delete",
+                    text=f"Are you sure you want to delete session '{title}' ({sid})?\nThis action cannot be undone.",
+                ).run_async()
+            except Exception:
+                return None
             if confirmed:
                 return {"action": "delete", "session": selected_session}
             return None

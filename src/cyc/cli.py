@@ -434,20 +434,20 @@ class CliApp:
                     console.print("[yellow]No saved sessions found to manage.[/yellow]")
                     return True
 
-                action_result = self.ui.interactive_session_picker(sessions)
+                action_result = await self.ui.interactive_session_picker(sessions)
                 if not action_result:
                     return True
 
                 act = action_result.get("action")
                 sess_meta = action_result.get("session") or {}
-                sess_id = sess_meta.get("id")
-                source = sess_meta.get("source", "cyc").lower()
+                sess_id = sess_meta.get("id") or sess_meta.get("session_id")
+                source = (sess_meta.get("agent") or sess_meta.get("source") or "cyc").lower()
 
                 if act == "resume":
                     # Delegate to /resume logic
                     return await self.handle_slash_command(f"/resume {source} {sess_id}")
                 elif act == "rename":
-                    new_title = action_result.get("title")
+                    new_title = action_result.get("new_title") or action_result.get("title")
                     if new_title and sess_id:
                         if source != "cyc":
                             console.print(f"[yellow]Renaming external session '{source}' is not supported yet.[/yellow]")
