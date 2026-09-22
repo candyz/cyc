@@ -39,12 +39,12 @@ def test_command_completer():
     # Test /sessions completion
     doc_sessions = Document("/sessions ")
     completions_sessions = list(completer.get_completions(doc_sessions, None))
-    assert [c.text for c in completions_sessions] == ["all", "cyc", "agy", "claude", "pi", "opencode"]
+    expected_options = ["all", "cyc", "agy", "claude", "pi", "opencode", "manage", "delete", "rm", "prune", "clean", "rename"]
+    assert [c.text for c in completions_sessions] == expected_options
 
     doc_sessions_pi = Document("/sessions p")
     completions_sessions_pi = list(completer.get_completions(doc_sessions_pi, None))
-    assert len(completions_sessions_pi) == 1
-    assert completions_sessions_pi[0].text == "pi"
+    assert [c.text for c in completions_sessions_pi] == ["pi", "prune"]
 
     # Test /resume completion
     def fake_get_sessions(agent=None):

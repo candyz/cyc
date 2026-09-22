@@ -184,3 +184,49 @@ def test_session_auto_compact():
     assert session.total_estimated_tokens() <= 200
 
 
+def test_session_delete_and_prune(tmp_path: Path):
+    sessions_dir = tmp_path / "sessions"
+
+    # Create 3 sessions:
+    # Session 1: empty/1 msg, auto title
+    s1 = SessionManager(session_id="empty_sess_01", sessions_dir=sessions_dir)
+    s1.add_user_message("hello test")
+
+    # Session 2: empty/1 msg, but custom user title
+    s2 = SessionManager(session_id="custom_title_02", sessions_dir=sessions_dir)
+    s2.add_user_message("hello")
+    s2.rename("Important Work")
+
+    # Session 3: multi messages
+    s3 = SessionManager(session_id="full_sess_03", sessions_dir=sessions_dir)
+    s3.add_user_message("msg 1")
+    s3.add_assistant_message("ans 1")
+    s3.add_user_message("msg 2")
+
+    # Verify all 3 exist
+    assert (sessions_dir / "empty_sess_01.json").exists()
+    assert (sessions_dir / "custom_title_02.json").exists()
+    assert (sessions_dir / "full_sess_03.json").exists()
+
+    # Prune sessions with <= 1 message and without custom title
+    pruned = SessionManager.prune_sessions(max_messages=1, sessions_dir=sessions_dir)
+    assert pruned == 1
+    assert not (sessions_dir / "empty_sess_01.json").exists()
+    assert (sessions_dir / "custom_title_02.json").exists()
+    assert (sessions_dir / "full_sess_03.json").exists()
+
+    # Delete session by title
+    del_res = SessionManager.delete_session("Important Work", sessions_dir=sessions_dir)
+    assert del_res is True
+    assert not (sessions_dir / "custom_title_02.json").exists()
+
+    # Delete session by ID prefix
+    del_res2 = SessionManager.delete_session("full_sess", sessions_dir=sessions_dir)
+    assert del_res2 is True
+    assert not (sessions_dir / "full_sess_03.json").exists()
+
+    # Delete non-existent session
+    assert SessionManager.delete_session("non_existent", sessions_dir=sessions_dir) is False
+
+
+

@@ -358,4 +358,35 @@ agent:
                 assert kwargs["permission_mode"] == PermissionMode.AUTO
 
 
+@pytest.mark.asyncio
+async def test_slash_command_sessions_subcommands(tmp_path):
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+    app.session.sessions_dir = tmp_path / "sessions"
+
+    # Create dummy session to delete/rename
+    other_sess = SessionManager(session_id="dummy_sess_to_manage", sessions_dir=app.session.sessions_dir)
+    other_sess.add_user_message("Dummy conversation")
+
+    # 1. /sessions rename
+    handled = await app.handle_slash_command("/sessions rename dummy_sess_to_manage New Title")
+    assert handled is True
+    reloaded = SessionManager.find_session("dummy_sess_to_manage", sessions_dir=app.session.sessions_dir)
+    assert reloaded.title == "New Title"
+
+    # 2. /sessions prune
+    handled = await app.handle_slash_command("/sessions prune 5")
+    assert handled is True
+
+    # 3. /sessions delete
+    handled = await app.handle_slash_command("/sessions delete dummy_sess_to_manage")
+    assert handled is True
+    assert SessionManager.find_session("dummy_sess_to_manage", sessions_dir=app.session.sessions_dir) is None
+
+    # 4. /sessions delete current session should be blocked
+    handled = await app.handle_slash_command(f"/sessions delete {app.session.session_id}")
+    assert handled is True
+
+
+
 

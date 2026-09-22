@@ -60,6 +60,7 @@ class SessionManager:
         self.model = model
         self.mode = mode
         self.title = title or ""
+        self.is_custom_title = bool(title)
         self.compact_threshold = compact_threshold
         if max_context_tokens is not None and max_context_tokens > 0:
             self.max_context_tokens = max_context_tokens
@@ -146,6 +147,7 @@ class SessionManager:
     def rename(self, new_title: str) -> None:
         """Rename this session with a user-friendly title."""
         self.title = new_title.strip()
+        self.is_custom_title = True
         self.updated_at = time.time()
         self.append_event("session_renamed", {"title": self.title})
         target_file = self.sessions_dir / f"{self.session_id}.json"
@@ -354,6 +356,7 @@ class SessionManager:
             "compact_threshold": self.compact_threshold,
             "external_metadata": self.external_metadata,
             "estimated_tokens": self.total_estimated_tokens(),
+            "is_custom_title": self.is_custom_title,
         }
 
     @classmethod
@@ -369,6 +372,7 @@ class SessionManager:
             sessions_dir=sessions_dir,
             title=data.get("title", ""),
         )
+        manager.is_custom_title = data.get("is_custom_title", bool(data.get("title") and any(e.get("type") == "session_renamed" for e in data.get("events", []))))
         manager.created_at = data.get("created_at", time.time())
         manager.updated_at = data.get("updated_at", manager.created_at)
         manager.messages = data.get("messages", [])
@@ -433,10 +437,15 @@ class SessionManager:
                         if len(preview) > 60:
                             preview = preview[:57] + "..."
                         break
+                is_custom = data.get("is_custom_title", False)
+                if not is_custom and data.get("title") and any(e.get("type") == "session_renamed" for e in data.get("events", [])):
+                    is_custom = True
+
                 results.append({
                     "id": data.get("session_id", file.stem),
                     "session_id": data.get("session_id", file.stem),
                     "title": data.get("title", ""),
+                    "is_custom_title": is_custom,
                     "agent": "cyc",
                     "created_at": data.get("created_at", file.stat().st_mtime),
                     "updated_at": data.get("updated_at", file.stat().st_mtime),
@@ -496,6 +505,58 @@ class SessionManager:
                 return cls.load_json(s["file_path"], sessions_dir=sessions_dir)
 
         return None
+
+    @classmethod
+    def delete_session(cls, query: str, sessions_dir: Optional[Path] = None) -> bool:
+        """Delete a saved session by ID, exact title, or path. Return True if deleted."""
+        target_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        sess = cls.find_session(query, sessions_dir=sessions_dir)
+        if sess:
+            target_file = target_dir / f"{sess.session_id}.json"
+            if target_file.exists():
+                try:
+                    target_file.unlink()
+                    return True
+                except Exception:
+                    pass
+        # Fallback to direct filename
+        direct_file = target_dir / f"{query}.json"
+        if direct_file.exists():
+            try:
+                direct_file.unlink()
+                return True
+            except Exception:
+                pass
+        return False
+
+    @classmethod
+    def prune_sessions(
+        cls,
+        max_messages: int = 1,
+        sessions_dir: Optional[Path] = None,
+    ) -> int:
+        """Prune empty or near-empty sessions with message count <= max_messages and no custom title.
+        Returns the number of pruned session files.
+        """
+        target_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        pruned_count = 0
+        sessions = cls.list_sessions(sessions_dir=sessions_dir)
+        for s in sessions:
+            # Only prune CYC local sessions
+            if s.get("agent") != "cyc":
+                continue
+            # Keep sessions that have a custom title
+            if s.get("is_custom_title"):
+                continue
+            if s.get("message_count", 0) <= max_messages:
+                file_path = s.get("file_path")
+                if file_path and Path(file_path).exists():
+                    try:
+                        Path(file_path).unlink()
+                        pruned_count += 1
+                    except Exception:
+                        pass
+        return pruned_count
 
 # For backward compatibility
 Session = SessionManager

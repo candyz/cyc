@@ -349,7 +349,11 @@ class CliApp:
   /skills                     List available skills (builtin, global, workspace)
   /skill <name>               Apply a specialized skill to agent instructions
   /trust <action>             Check or change current workspace trust status (show/allow/deny)
-  /sessions <source>          List all saved chat & agent sessions (all, cyc, agy, etc.)
+  /sessions <source>          List saved sessions (all, cyc, agy, etc.)
+  /sessions manage            Interactive session manager (Resume, Rename, Delete)
+  /sessions delete <id>       Delete a local cyc session (alias: /sessions rm)
+  /sessions prune             Clean up empty or single-message test sessions
+  /sessions rename <id> <t>   Rename a specific cyc session
   /resume <id|title>          Resume a previous session (or latest if omitted)
   /rename <title>             Rename current session with a descriptive title
   /fork <id>                  Fork current session into a new branch
@@ -369,7 +373,104 @@ class CliApp:
   /exit or /quit              Exit CLI""")
             return True
         elif action == "/sessions":
-            # Support: /sessions [all|cyc|agy|claude|pi|opencode]
+            # Support:
+            # 1. /sessions delete <id|title> or /sessions rm <id|title>
+            # 2. /sessions prune [max_messages] or /sessions clean [max_messages]
+            # 3. /sessions rename <id> <new_title>
+            # 4. /sessions manage (or -i / --interactive)
+            # 5. /sessions [all|cyc|agy|claude|pi|opencode]
+            sub_parts = arg.split(maxsplit=2) if arg else []
+            sub_cmd = sub_parts[0].lower() if sub_parts else ""
+
+            if sub_cmd in ("delete", "rm"):
+                if len(sub_parts) < 2:
+                    console.print("[yellow]Usage: /sessions delete <session_id|title>[/yellow]")
+                    return True
+                target_query = arg[len(sub_parts[0]):].strip()
+                # If target is currently active session
+                if self.session.session_id == target_query or (self.session.title and self.session.title == target_query):
+                    console.print("[bold yellow]Cannot delete currently active session. Switch or create a new session first.[/bold yellow]")
+                    return True
+                success = SessionManager.delete_session(target_query, sessions_dir=self.session.sessions_dir)
+                if success:
+                    console.print(f"[bold green]✓ Session successfully deleted:[/bold green] [bold cyan]{target_query}[/bold cyan]")
+                else:
+                    console.print(f"[bold red]Session not found or could not be deleted:[/bold red] {target_query}")
+                return True
+
+            elif sub_cmd in ("prune", "clean"):
+                max_msgs = 1
+                if len(sub_parts) > 1 and sub_parts[1].isdigit():
+                    max_msgs = int(sub_parts[1])
+                deleted_count = SessionManager.prune_sessions(max_messages=max_msgs, sessions_dir=self.session.sessions_dir)
+                console.print(f"[bold green]✓ Cleaned up {deleted_count} empty / test sessions (messages ≤ {max_msgs}).[/bold green]")
+                return True
+
+            elif sub_cmd == "rename":
+                if len(sub_parts) < 3:
+                    console.print("[yellow]Usage: /sessions rename <session_id> <new_title>[/yellow]")
+                    return True
+                target_id = sub_parts[1]
+                new_title = arg.split(maxsplit=2)[2].strip()
+                target_sess = SessionManager.find_session(target_id, sessions_dir=self.session.sessions_dir)
+                if target_sess:
+                    target_sess.rename(new_title)
+                    console.print(f"[bold green]✓ Session {target_id} renamed to:[/bold green] [bold cyan]{new_title}[/bold cyan]")
+                else:
+                    console.print(f"[bold red]Session not found:[/bold red] {target_id}")
+                return True
+
+            elif sub_cmd in ("manage", "-i", "--interactive"):
+                # Collect all sessions for interactive management
+                sessions = []
+                sessions.extend(SessionManager.list_sessions(sessions_dir=self.session.sessions_dir))
+                sessions.extend(SessionAdapters.list_agy_sessions())
+                sessions.extend(SessionAdapters.list_claude_sessions())
+                sessions.extend(SessionAdapters.list_pi_sessions())
+                sessions.extend(SessionAdapters.list_opencode_sessions())
+                sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+
+                if not sessions:
+                    console.print("[yellow]No saved sessions found to manage.[/yellow]")
+                    return True
+
+                action_result = self.ui.interactive_session_picker(sessions)
+                if not action_result:
+                    return True
+
+                act = action_result.get("action")
+                sess_meta = action_result.get("session") or {}
+                sess_id = sess_meta.get("id")
+                source = sess_meta.get("source", "cyc").lower()
+
+                if act == "resume":
+                    # Delegate to /resume logic
+                    return await self.handle_slash_command(f"/resume {source} {sess_id}")
+                elif act == "rename":
+                    new_title = action_result.get("title")
+                    if new_title and sess_id:
+                        if source != "cyc":
+                            console.print(f"[yellow]Renaming external session '{source}' is not supported yet.[/yellow]")
+                        else:
+                            target_sess = SessionManager.find_session(sess_id)
+                            if target_sess:
+                                target_sess.rename(new_title)
+                                console.print(f"[bold green]✓ Session {sess_id} renamed to:[/bold green] [bold cyan]{new_title}[/bold cyan]")
+                elif act == "delete":
+                    if source != "cyc":
+                        console.print(f"[yellow]Deleting external session from '{source}' is not supported directly in cyc.[/yellow]")
+                    else:
+                        if self.session.session_id == sess_id:
+                            console.print("[bold yellow]Cannot delete currently active session.[/bold yellow]")
+                        else:
+                            success = SessionManager.delete_session(sess_id)
+                            if success:
+                                console.print(f"[bold green]✓ Session successfully deleted:[/bold green] [bold cyan]{sess_id}[/bold cyan]")
+                            else:
+                                console.print(f"[bold red]Could not delete session:[/bold red] {sess_id}")
+                return True
+
+            # Standard listing
             filter_source = arg.lower() if arg else "all"
             sessions = []
             if filter_source in ("all", "cyc"):
@@ -387,7 +488,8 @@ class CliApp:
 
             if sessions:
                 self.ui.print_sessions_table(sessions)
-                console.print("[dim]Use '/resume [agent] <session_id>' (or --resume <id>) to resume or import from agy, claude, pi, or opencode.[/dim]")
+                console.print("[dim]Use '/sessions manage' for interactive selection (Resume / Rename / Delete).[/dim]")
+                console.print("[dim]Use '/resume [agent] <session_id>' (or --resume <id>) to resume or import.[/dim]")
             else:
                 console.print(f"[yellow]No saved sessions found for source '{filter_source}'.[/yellow]")
             return True

@@ -129,11 +129,11 @@ class CommandCompleter(Completer):
                 if p.lower().startswith(arg_prefix.lower()):
                     yield Completion(p, start_position=-len(arg_prefix))
         elif cmd == "/sessions":
-            # Tab completion for sources: all, cyc, agy, claude, pi, opencode
-            sources = ["all", "cyc", "agy", "claude", "pi", "opencode"]
-            for s in sources:
-                if s.startswith(arg_prefix.lower()):
-                    yield Completion(s, start_position=-len(arg_prefix))
+            # Tab completion for sources and subcommands:
+            options = ["all", "cyc", "agy", "claude", "pi", "opencode", "manage", "delete", "rm", "prune", "clean", "rename"]
+            for opt in options:
+                if opt.startswith(arg_prefix.lower()):
+                    yield Completion(opt, start_position=-len(arg_prefix))
         elif cmd == "/resume":
             if self.get_sessions:
                 # Check if user has typed an agent prefix, e.g. "/resume agy "
@@ -316,6 +316,77 @@ class TerminalUI:
                 s.get("preview", ""),
             )
         self.console.print(table)
+
+    def interactive_session_picker(self, sessions: List[Dict]) -> Optional[Dict[str, Any]]:
+        """Interactive session selector with Resume, Rename, and Delete actions.
+        Returns a dict e.g. {"action": "resume"|"rename"|"delete", "session": s, "new_title": ...} or None.
+        """
+        if not sessions:
+            self.console.print("[yellow]No sessions available to manage.[/yellow]")
+            return None
+
+        from prompt_toolkit.shortcuts import radiolist_dialog, button_dialog, input_dialog, yes_no_dialog
+
+        # Prepare values for radiolist: (session_dict, display_label)
+        values = []
+        for s in sessions:
+            agent = s.get("agent", "cyc").upper()
+            sid = s.get("id") or s.get("session_id", "")
+            title = s.get("title") or s.get("preview") or sid
+            if len(title) > 42:
+                title = title[:39] + "..."
+            msgs = s.get("message_count", 0)
+            label = f"[{agent}] {title} ({msgs} msgs) - {sid[:18]}"
+            values.append((s, label))
+
+        selected_session = radiolist_dialog(
+            title="Session Manager (Claude Code style)",
+            text="Choose a session using Up/Down arrows and Enter:",
+            values=values,
+            ok_text="Select",
+            cancel_text="Cancel",
+        ).run()
+
+        if not selected_session:
+            return None
+
+        # Next, ask for action on selected session
+        sid = selected_session.get("id") or selected_session.get("session_id", "")
+        title = selected_session.get("title") or "(no title)"
+        action = button_dialog(
+            title=f"Manage: {title}",
+            text=f"Session ID: {sid}\nAgent: {selected_session.get('agent', 'cyc')}\nWhat would you like to do?",
+            buttons=[
+                ("Resume", "resume"),
+                ("Rename", "rename"),
+                ("Delete", "delete"),
+                ("Cancel", "cancel"),
+            ],
+        ).run()
+
+        if not action or action == "cancel":
+            return None
+
+        if action == "rename":
+            new_title = input_dialog(
+                title="Rename Session",
+                text=f"Current title: {title}\nEnter new title:",
+                default=selected_session.get("title", ""),
+            ).run()
+            if new_title and new_title.strip():
+                return {"action": "rename", "session": selected_session, "new_title": new_title.strip()}
+            return None
+
+        if action == "delete":
+            confirmed = yes_no_dialog(
+                title="Confirm Delete",
+                text=f"Are you sure you want to delete session '{title}' ({sid})?\nThis action cannot be undone.",
+            ).run()
+            if confirmed:
+                return {"action": "delete", "session": selected_session}
+            return None
+
+        return {"action": "resume", "session": selected_session}
 
     def print_tools_table(self, tools: List[Any]):
         table = Table(title=f"Registered Agent Tools ({len(tools)})", box=ROUNDED)
