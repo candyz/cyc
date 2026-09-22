@@ -33,7 +33,7 @@ def test_load_default_config():
     assert "opencode" in config.providers
     assert config.get_provider("ollama").base_url == "http://localhost:11434/v1"
     assert config.get_provider("omlx").base_url == "http://localhost:8000/v1"
-    assert config.agent.default_mode == "chat"
+    assert config.agent.default_mode == "agent"
     assert config.agent.auto_approve is False
     assert config.agent.default_trust is None
 

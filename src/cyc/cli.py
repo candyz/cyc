@@ -41,7 +41,7 @@ class CliApp:
         config: Config,
         provider_name: Optional[str] = None,
         model_name: Optional[str] = None,
-        mode: str = "chat",
+        mode: str = "agent",
         permission_mode: PermissionMode = PermissionMode.INTERACTIVE,
         session: Optional[SessionManager] = None,
     ):
@@ -297,7 +297,29 @@ class CliApp:
         except Exception as e:
             console.print(f"[bold red]Failed to execute command:[/bold red] {e}")
 
+    async def stream_direct_chat(self, prompt: str) -> None:
+        """Stream a lightweight, single-turn answer without invoking agent tools."""
+        self.session.add_user_message(prompt)
+        try:
+            with self.fixed_status_bar_scroll_region():
+                stream_gen = self.provider.chat_stream(self.session.get_messages(), self.model)
+                response_text = await self.ui.stream_response(
+                    stream_gen=stream_gen,
+                    provider=self.provider_name,
+                    model=self.model,
+                )
+                if response_text:
+                    self.session.add_assistant_message(response_text)
+        except Exception as e:
+            console.print(f"\n[bold red]API Error:[/bold red] {e}\n")
+
     async def run_single_prompt(self, user_prompt: str) -> None:
+        if user_prompt.startswith("?") or user_prompt.startswith("/chat "):
+            clean_prompt = user_prompt[1:].strip() if user_prompt.startswith("?") else user_prompt[6:].strip()
+            if clean_prompt:
+                await self.stream_direct_chat(clean_prompt)
+                return
+
         if self.mode == "agent":
             try:
                 await self.agent_loop.run_turn(user_prompt)
@@ -307,32 +329,7 @@ class CliApp:
                 console.print(f"\n[bold red]Agent Error:[/bold red] {e}")
             return
 
-        self.session.add_user_message(user_prompt)
-        try:
-            stream_gen = self.provider.chat_stream(self.session.get_messages(), self.model)
-            response_text = ""
-            first_chunk = None
-
-            if sys.stdout.isatty():
-                with console.status("[dim cyan]Thinking...[/dim cyan]", spinner="dots"):
-                    try:
-                        first_chunk = await stream_gen.__anext__()
-                    except StopAsyncIteration:
-                        first_chunk = None
-                if first_chunk:
-                    sys.stdout.write(first_chunk)
-                    sys.stdout.flush()
-                    response_text += first_chunk
-
-            async for chunk in stream_gen:
-                sys.stdout.write(chunk)
-                sys.stdout.flush()
-                response_text += chunk
-            sys.stdout.write("\n")
-            sys.stdout.flush()
-            self.session.add_assistant_message(response_text)
-        except Exception as e:
-            console.print(f"\n[bold red]Error:[/bold red] {e}")
+        await self.stream_direct_chat(user_prompt)
 
     async def handle_slash_command(self, cmd: str) -> bool:
         """Handle slash commands. Return True if command was handled."""
@@ -354,6 +351,7 @@ class CliApp:
   /help                       Show this help message
   !<command>                  Execute a local shell command directly (e.g. !git status, !ls)
   /mode <mode>                Switch or inspect interaction mode (chat or agent)
+  /chat <query>               Quick direct chat question bypassing tools (shortcut: ? <query>)
   /loop <strategy> <turns>    Switch or inspect Agent loop strategy and max turns limit
   /tools                      List registered agent tools (built-in & MCP)
   /skills                     List available skills (builtin, global, workspace)
@@ -618,6 +616,12 @@ class CliApp:
             console.print(f"[bold green]Resumed session:[/bold green] {self.session.session_id} ([cyan]{len(self.session.messages)} messages[/cyan], mode: [magenta]{self.mode}[/magenta])")
             if self.session.messages:
                 self.ui.render_resumed_history(self.session.messages)
+            return True
+        elif action == "/chat":
+            if not arg:
+                console.print("[dim yellow]Usage: /chat <query> (or prefix prompt with '?') to ask a quick question without invoking tools.[/dim yellow]")
+            else:
+                await self.stream_direct_chat(arg)
             return True
         elif action == "/mode":
             if not arg:
@@ -1033,7 +1037,7 @@ class CliApp:
                 bottom_toolbar=self._get_status_toolbar,
             )
 
-            prompt_label = "... > " if self.multiline_mode else f"[{self.mode}] you > "
+            prompt_label = "... > " if self.multiline_mode else (f"[{self.mode}] you > " if self.mode != "agent" else "you > ")
 
             try:
                 user_input = await asyncio.to_thread(prompt_session.prompt, prompt_label)
@@ -1052,6 +1056,13 @@ class CliApp:
                     if handled:
                         continue
 
+                # Quick direct chat shortcut: ? <question> bypasses agent tools
+                if user_input.startswith("?"):
+                    clean_q = user_input[1:].strip()
+                    if clean_q:
+                        await self.stream_direct_chat(clean_q)
+                    continue
+
                 if self.mode == "agent":
                     try:
                         with self.fixed_status_bar_scroll_region():
@@ -1063,20 +1074,7 @@ class CliApp:
                         console.print(f"\n[bold red]Agent Error:[/bold red] {e}\n")
                     continue
 
-                self.session.add_user_message(user_input)
-
-                try:
-                    with self.fixed_status_bar_scroll_region():
-                        stream_gen = self.provider.chat_stream(self.session.get_messages(), self.model)
-                        response_text = await self.ui.stream_response(
-                            stream_gen=stream_gen,
-                            provider=self.provider_name,
-                            model=self.model,
-                        )
-                        if response_text:
-                            self.session.add_assistant_message(response_text)
-                except Exception as e:
-                    console.print(f"\n[bold red]API Error:[/bold red] {e}\n")
+                await self.stream_direct_chat(user_input)
 
             except (KeyboardInterrupt, EOFError):
                 console.print("\n[dim]Exiting cyc...[/dim]")

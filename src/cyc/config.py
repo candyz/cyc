@@ -42,7 +42,7 @@ class AgentConfig(BaseModel):
     max_turns: int = 100
     compact_threshold: float = 0.80
     searxng_url: str = "https://searx.be"
-    default_mode: str = "chat"  # "chat" or "agent"
+    default_mode: str = "agent"  # "agent" or "chat" (Agent-First architecture)
     auto_approve: bool = False  # If True, equivalent to --yes
     default_trust: Optional[bool] = None  # True (trust), False (no-trust), or None (interactive prompt)
 
@@ -254,7 +254,7 @@ providers:
 
 # Agent configuration
 agent:
-  default_mode: "chat"            # "chat" or "agent" (set to "agent" to default to --agent)
+  default_mode: "agent"           # "agent" or "chat" (defaults to autonomous Agent mode)
   auto_approve: false             # true to auto-approve mutation tools (equivalent to --yes)
   default_trust: null             # true (trust), false (no-trust/read-only), or null (prompt when entering workspace)
   max_turns: 100

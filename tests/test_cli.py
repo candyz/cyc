@@ -94,17 +94,17 @@ def test_parse_args_agent_flags():
 async def test_handle_slash_command_mode_and_tools():
     config = load_config(Path("/nonexistent"))
     app = CliApp(config, provider_name="ollama")
-    assert app.mode == "chat"
-
-    handled = await app.handle_slash_command("/mode agent")
-    assert handled is True
     assert app.mode == "agent"
-    assert app.session.system_prompt is not None
 
     handled = await app.handle_slash_command("/mode chat")
     assert handled is True
     assert app.mode == "chat"
     assert app.session.system_prompt is None
+
+    handled = await app.handle_slash_command("/mode agent")
+    assert handled is True
+    assert app.mode == "agent"
+    assert app.session.system_prompt is not None
 
     handled = await app.handle_slash_command("/tools")
     assert handled is True
@@ -409,6 +409,29 @@ async def test_async_main_interactive_resume(tmp_path):
                         await async_main()
                         assert mock_picker.called
                         assert mock_repl.called
+
+
+@pytest.mark.asyncio
+async def test_quick_chat_shortcuts():
+    config = load_config(Path("/nonexistent"))
+    app = CliApp(config, provider_name="ollama")
+    app.stream_direct_chat = AsyncMock()
+
+    # 1. /chat command
+    handled = await app.handle_slash_command("/chat What is recursion?")
+    assert handled is True
+    app.stream_direct_chat.assert_awaited_with("What is recursion?")
+
+    # 2. run_single_prompt with '?' prefix
+    app.stream_direct_chat.reset_mock()
+    await app.run_single_prompt("? Explain quantum computing")
+    app.stream_direct_chat.assert_awaited_with("Explain quantum computing")
+
+    # 3. run_single_prompt with '/chat ' prefix
+    app.stream_direct_chat.reset_mock()
+    await app.run_single_prompt("/chat Explain photosynthesis")
+    app.stream_direct_chat.assert_awaited_with("Explain photosynthesis")
+
 
 
 

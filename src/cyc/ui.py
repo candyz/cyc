@@ -50,6 +50,7 @@ class CommandCompleter(Completer):
         self.commands = [
             "/help",
             "/mode",
+            "/chat",
             "/loop",
             "/tools",
             "/skills",

@@ -53,40 +53,44 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 
 ---
 
-## 2. 兩種運作模式 (Mode)
+## 2. 兩種運作模式 (Mode) 與快速問答捷徑
 
-`cyc` 支援兩種核心執行模式：
+`cyc` 採用 **Agent-First** 設計架構，預設進入自主編程代理模式，同時支援極速問答語法糖：
 
-### 2.1 💬 聊天模式 (Chat Mode - 預設)
-- 專注於即時串流問答、概念諮詢與文字編輯。
-- 結合 `rich.live` 即時排版 Markdown、表格與語法高亮。
-- 支援 `<think>` 思考鏈（Thinking Process）專屬折疊面板渲染。
-
-### 2.2 🤖 自主編程代理模式 (Coding Agent Mode)
-- 具備自主決策循環（ReAct Agent Loop），模型能主動調用工具讀寫檔案、檢索專案及執行命令。
-- 啟動方式：
+### 2.1 🤖 自主編程代理模式 (Coding Agent Mode - 預設)
+- **開箱即用**：預設提示字元為 `you > `，具備自主決策循環（ReAct Agent Loop），模型能主動調用工具讀寫檔案、檢索專案及執行命令。
+- 啟動與控制方式：
   ```bash
-  # 啟動時直接進入 Agent 模式
-  cyc --agent
+  # 預設直接啟動 Agent 模式
+  cyc
 
   # 免確認模式 (自動執行所有工具呼叫)
-  cyc --agent -y
+  cyc -y (或 cyc --agent -y)
 
   # 唯讀沙箱模式 (禁止任何檔案修改或指令執行)
-  cyc --agent --read-only
+  cyc --read-only
 
-  # 若設定檔已預設為 agent，欲臨時以交談模式啟動：
+  # 臨時以純交談模式啟動：
   cyc --chat
   ```
 - **全域預設配置 (`~/.config/cyc/config.yaml`)**：
-  若您希望每次執行 `cyc` 都預設啟用 Agent 模式且免確認，可於設定檔直接配置：
   ```yaml
   agent:
-    default_mode: "agent"  # 開機預設為 agent (命令列可使用 --chat 臨時覆蓋)
-    auto_approve: true     # 開機預設等同 -y/--yes，跳過每次工具確認
-    default_trust: true    # 預設信任目前工作區 (略過 [y/n/q] 提示)
+    default_mode: "agent"  # 預設為 agent (命令列可使用 --chat 臨時切換為純交談)
+    auto_approve: false    # 是否免確認自動放行變更工具
+    default_trust: null    # 工作區信任策略 (true/false/null)
   ```
-- 或在 REPL 中輸入 `/mode agent` / `/mode chat` 隨時切換。
+
+### 2.2 ⚡ 快速問答捷徑 (Quick Chat Shortcuts)
+在預設的 Agent 模式下，若您只是想詢問概念問題或進行簡單諮詢，完全**不需要**切換模式：
+- **`?` 前綴捷徑**：在輸入開頭加上 `?`，例如 `? list 與 tuple 有何差別？`，系統會直接觸發單輪串流文字回覆，**完全不載入工具與啟動 Agent Loop**，極速省時且省 Token。
+- **`/chat` 指令捷徑**：輸入 `/chat <query>`（例如 `/chat 寫一個正則表達式驗證 Email`），同樣直接執行高速純文字問答。
+
+### 2.3 💬 純交談模式 (Chat Mode)
+- 當透過 `/mode chat` 或命令列 `--chat` 進入純聊天模式時，提示字元將顯示為 `[chat] you > `。
+- 專注於傳統即時串流問答、概念諮詢與文字編輯，整場會話皆不使用 Agent 工具。
+- 結合 `rich.live` 即時排版 Markdown、表格與語法高亮，並支援 `<think>` 思考鏈折疊渲染。
+- 隨時可輸入 `/mode agent` 切換回自主代理模式。
 
 ---
 
@@ -233,13 +237,15 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `!<command>` | 本地 Shell 快捷執行（例如 `!git status`、`!ls`） |
 | :--- | :--- |
 | `/help` | 顯示所有指令清單與格式說明 |
-| `/mode <mode>` | 切換或檢視互動模式 (`chat` 或 `agent`) |
+| `/mode <mode>` | 切換或檢視互動模式 (`agent` 或 `chat`) |
+| `/chat <query>` | 快速純問答（亦可直接以 `? <query>` 前綴），繞過 Agent 工具調用 |
 | `/loop <strategy> <turns>` | 切換或檢視 Agent Loop 策略與回合上限 (`standard`, `plan`, `minimal`) |
 | `/tools` | 表格化列出目前已註冊之內建工具與 MCP 外部工具 |
 | `/skills` | 列出所有可用技能（內建 commit, test, refactor，全域或專案專屬） |
 | `/skill <name>` | 動態載入特定技能工作指引至 Agent 系統提示詞中 |
 | `/trust <action>` | 檢視或切換專案工作區信任狀態 (`show`, `allow`, `deny`) |
 | `/sessions <source>` | 列出所有已儲存會話（支援 `all`, `cyc`, `agy`, `claude`, `pi`, `opencode`） |
+| `/sessions manage` | 開啟互動式會話管理器（支援搜尋、預覽、改名、刪除與接續） |
 | `/resume <id>` | 接續現有會話或跨工具匯入歷史對話 |
 | `/fork <id>` | 將目前會話分岔出獨立分支並立即切換 |
 | `/sync <agent>` | 雙向寫回外部代理（支援 `agy`, `claude`, `pi`, `opencode`，自動或手動指定，原工具可接續開發） |
