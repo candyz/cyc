@@ -275,18 +275,18 @@ class TerminalUI:
 
     def print_sessions_table(self, sessions: List[Dict]):
         table = Table(title=f"Chat & Agent Sessions ({len(sessions)})", box=ROUNDED)
-        table.add_column("Agent / Source", style="bold yellow", justify="center")
-        table.add_column("Session ID", style="bold cyan")
-        table.add_column("Title / Name", style="bold white", max_width=25, overflow="ellipsis")
-        table.add_column("Mode", justify="center")
-        table.add_column("Provider / Model", style="green")
-        table.add_column("Msgs", justify="right")
-        table.add_column("Last Updated", style="dim")
-        table.add_column("Latest Preview", style="dim", max_width=35, overflow="ellipsis")
+        table.add_column("Agent", style="bold yellow", justify="center", no_wrap=True)
+        table.add_column("Session ID", style="bold cyan", min_width=18, overflow="fold")
+        table.add_column("Title / Name", style="bold white", overflow="fold")
+        table.add_column("Mode", justify="center", no_wrap=True)
+        table.add_column("Provider / Model", style="green", overflow="ellipsis")
+        table.add_column("Msgs", justify="right", no_wrap=True)
+        table.add_column("Updated", style="dim", no_wrap=True)
+        table.add_column("Preview", style="dim", max_width=30, overflow="ellipsis")
 
         import datetime
         for s in sessions:
-            m_time = datetime.datetime.fromtimestamp(s["updated_at"]).strftime("%Y-%m-%d %H:%M")
+            m_time = datetime.datetime.fromtimestamp(s["updated_at"]).strftime("%m-%d %H:%M")
             mode_badge = "[magenta]AGENT[/magenta]" if s.get("mode") == "agent" else "[cyan]CHAT[/cyan]"
             prov = s.get('provider') or '-'
             mod = s.get('model') or '-'
@@ -304,9 +304,10 @@ class TerminalUI:
                 agent_col = "[bold green]CYC[/bold green]"
 
             title_text = s.get("title") or "-"
+            sid = s.get("id") or s.get("session_id", "-")
             table.add_row(
                 agent_col,
-                s["session_id"] if "session_id" in s else s.get("id", "-"),
+                sid,
                 title_text,
                 mode_badge,
                 prov_model,
