@@ -115,6 +115,15 @@ async def test_terminal_ui_stream_response():
     output = await ui.stream_response(fake_stream(), provider="test-prov", model="test-mod")
     assert output == "Hello World!"
 
+    # Test stream_response with <think> tags
+    async def fake_think_stream():
+        yield "<think>\nAnalyzing weather data...\n"
+        yield "</think>\nTD29 has formed into a tropical depression."
+
+    think_output = await ui.stream_response(fake_think_stream(), provider="test-prov", model="test-mod")
+    assert "<think>" in think_output
+    assert "TD29" in think_output
+
 
 def test_terminal_ui_render_resumed_history():
     ui = TerminalUI(stream_markdown=True)

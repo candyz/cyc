@@ -456,10 +456,12 @@ class TerminalUI:
         full_text += first_chunk
 
         # Live Markdown stream for remaining chunks
+        has_think = "<think>" in full_text
         try:
-            with Live(Markdown(full_text), console=self.console, refresh_per_second=12, transient=False) as live:
+            with Live(Markdown(full_text), console=self.console, refresh_per_second=12, transient=True) as live:
                 # Update initial display if first chunk contained thinking
                 if "<think>" in full_text and "</think>" not in full_text:
+                    has_think = True
                     think_part = full_text.split("<think>", 1)[1]
                     live.update(Markdown(f"> *Thinking...*\n\n```thinking\n{think_part}\n```"))
 
@@ -467,22 +469,25 @@ class TerminalUI:
                     full_text += chunk
                     # During streaming, if <think> tags are present, show a thinking indicator or styled text
                     if "<think>" in full_text and "</think>" not in full_text:
+                        has_think = True
                         think_part = full_text.split("<think>", 1)[1]
                         live.update(Markdown(f"> *Thinking...*\n\n```thinking\n{think_part}\n```"))
                     elif "<think>" in full_text and "</think>" in full_text:
+                        has_think = True
                         parts = full_text.split("</think>", 1)
                         content_part = parts[1].strip()
                         live.update(Markdown(content_part or "> *Thinking complete. Formulating response...*"))
                     else:
                         live.update(Markdown(full_text))
 
-            # After live streaming completes, if <think> tags were present, re-render cleanly
-            if "<think>" in full_text:
-                self.console.clear()
-                self.console.print(f"[bold cyan]{provider} ({model})[/bold cyan] > ")
+            # After live stream completes:
+            # If think tags were present, render the styled Thinking Process panel + clean markdown response.
+            # If standard response, print the full markdown.
+            if has_think:
                 self.render_formatted_response(full_text)
             else:
-                self.console.print()
+                self.console.print(Markdown(full_text))
+            self.console.print()
         except (asyncio.CancelledError, KeyboardInterrupt):
             self.console.print("\n[dim yellow](Interrupted by user)[/dim yellow]\n")
 
