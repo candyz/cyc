@@ -1,4 +1,6 @@
 import json
+import re
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -54,6 +56,8 @@ class SessionManager:
         compact_threshold: float = 0.80,
         sessions_dir: Optional[Path] = None,
         title: Optional[str] = None,
+        workspace: Optional[str] = None,
+        git_branch: Optional[str] = None,
     ):
         self.system_prompt = system_prompt
         self.provider = provider
@@ -68,6 +72,8 @@ class SessionManager:
             self.max_context_tokens = get_default_context_limit(provider, model)
         self.session_id = session_id or f"session_{int(time.time())}"
         self.sessions_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        self.workspace = workspace
+        self.git_branch = git_branch
         self.messages: List[Dict] = []
         self.created_at = time.time()
         self.updated_at = time.time()
@@ -357,10 +363,25 @@ class SessionManager:
             "external_metadata": self.external_metadata,
             "estimated_tokens": self.total_estimated_tokens(),
             "is_custom_title": self.is_custom_title,
+            "workspace": self.workspace,
+            "git_branch": self.git_branch,
         }
 
     @classmethod
     def from_dict(cls, data: Dict, sessions_dir: Optional[Path] = None) -> "SessionManager":
+        workspace = data.get("workspace")
+        git_branch = data.get("git_branch")
+        if not workspace or not git_branch:
+            sys_prompt = data.get("system_prompt") or ""
+            if not workspace:
+                m_cwd = re.search(r"Current Working Directory:\s*(.+)", sys_prompt)
+                if m_cwd:
+                    workspace = m_cwd.group(1).strip()
+            if not git_branch:
+                m_git = re.search(r"Git Branch:\s*##\s*([^\s\.]+)", sys_prompt)
+                if m_git:
+                    git_branch = m_git.group(1).strip()
+
         manager = cls(
             system_prompt=data.get("system_prompt"),
             max_context_tokens=data.get("max_context_tokens"),
@@ -371,6 +392,8 @@ class SessionManager:
             compact_threshold=data.get("compact_threshold", 0.80),
             sessions_dir=sessions_dir,
             title=data.get("title", ""),
+            workspace=workspace,
+            git_branch=git_branch,
         )
         manager.is_custom_title = data.get("is_custom_title", bool(data.get("title") and any(e.get("type") == "session_renamed" for e in data.get("events", []))))
         manager.created_at = data.get("created_at", time.time())
@@ -441,12 +464,27 @@ class SessionManager:
                 if not is_custom and data.get("title") and any(e.get("type") == "session_renamed" for e in data.get("events", [])):
                     is_custom = True
 
+                workspace = data.get("workspace")
+                git_branch = data.get("git_branch")
+                if not workspace or not git_branch:
+                    sys_prompt = data.get("system_prompt") or ""
+                    if not workspace:
+                        m_cwd = re.search(r"Current Working Directory:\s*(.+)", sys_prompt)
+                        if m_cwd:
+                            workspace = m_cwd.group(1).strip()
+                    if not git_branch:
+                        m_git = re.search(r"Git Branch:\s*##\s*([^\s\.]+)", sys_prompt)
+                        if m_git:
+                            git_branch = m_git.group(1).strip()
+
                 results.append({
                     "id": data.get("session_id", file.stem),
                     "session_id": data.get("session_id", file.stem),
                     "title": data.get("title", ""),
                     "is_custom_title": is_custom,
                     "agent": "cyc",
+                    "workspace": workspace or "",
+                    "git_branch": git_branch or "",
                     "created_at": data.get("created_at", file.stat().st_mtime),
                     "updated_at": data.get("updated_at", file.stat().st_mtime),
                     "provider": data.get("provider", ""),

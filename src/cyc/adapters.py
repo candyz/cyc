@@ -168,6 +168,8 @@ class SessionAdapters:
             preview = ""
             user_msg_count = 0
 
+            cwd = ""
+            git_branch = ""
             try:
                 with open(file, "r", encoding="utf-8") as f:
                     for line in f:
@@ -175,6 +177,10 @@ class SessionAdapters:
                         if not line:
                             continue
                         record = json.loads(line)
+                        if not cwd and record.get("cwd"):
+                            cwd = record.get("cwd")
+                        if not git_branch and record.get("git_branch"):
+                            git_branch = record.get("git_branch")
                         if record.get("type") == "user":
                             msg = record.get("message", {})
                             content = msg.get("content", "")
@@ -191,6 +197,8 @@ class SessionAdapters:
                 "agent": "claude",
                 "id": session_id,
                 "file_path": file,
+                "workspace": cwd,
+                "git_branch": git_branch,
                 "updated_at": mtime,
                 "message_count": user_msg_count,
                 "preview": preview or "(no user prompt)",

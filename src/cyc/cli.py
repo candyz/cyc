@@ -2,6 +2,7 @@ import argparse
 import asyncio
 from contextlib import contextmanager
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional, Dict, Any
@@ -72,6 +73,15 @@ class CliApp:
         # Agent configuration
         self.mode = mode  # "chat" or "agent"
         self.workspace_path = Path.cwd()
+        if not self.session.workspace:
+            self.session.workspace = str(self.workspace_path.resolve())
+        if not self.session.git_branch:
+            try:
+                r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=str(self.workspace_path), capture_output=True, text=True, timeout=1)
+                if r.returncode == 0:
+                    self.session.git_branch = r.stdout.strip()
+            except Exception:
+                pass
         self.trust_manager = WorkspaceTrustManager()
         self.is_workspace_trusted = self.trust_manager.get_trust_status(self.workspace_path)
 
@@ -434,7 +444,11 @@ class CliApp:
                     console.print("[yellow]No saved sessions found to manage.[/yellow]")
                     return True
 
-                action_result = await self.ui.interactive_session_picker(sessions)
+                action_result = await self.ui.interactive_session_picker(
+                    sessions,
+                    current_workspace=self.workspace_path,
+                    current_branch=getattr(self.session, "git_branch", None),
+                )
                 if not action_result:
                     return True
 
@@ -1082,7 +1096,7 @@ def parse_args():
     parser.add_argument("--chat", action="store_true", default=None, help="Force interactive Chat mode")
     parser.add_argument("-y", "--yes", action="store_true", default=None, help="Auto-approve all tool actions without interactive prompt")
     parser.add_argument("--read-only", action="store_true", help="Block all mutation tools (write_file, replace, run_command)")
-    parser.add_argument("-r", "--resume", nargs="?", const="LATEST", help="Resume a previous session by ID/prefix (or latest if omitted)")
+    parser.add_argument("-r", "--resume", nargs="?", const="__INTERACTIVE__", help="Resume a session (launches interactive Claude Code style session picker if ID omitted)")
     parser.add_argument("--max-turns", type=int, default=None, help="Maximum number of turns for Agent loop (default: 100)")
     parser.add_argument("--sessions", action="store_true", help="List all saved chat & agent sessions and exit")
     parser.add_argument("--trust", action="store_true", default=None, help="Explicitly trust current workspace without prompting")
@@ -1166,7 +1180,80 @@ async def async_main():
     # Handle '--resume'
     resumed_session: Optional[SessionManager] = None
     if args.resume is not None:
-        if args.resume == "LATEST":
+        if args.resume == "__INTERACTIVE__":
+            # Collect all sessions across all providers
+            sessions = []
+            sessions.extend(SessionManager.list_sessions())
+            sessions.extend(SessionAdapters.list_agy_sessions())
+            sessions.extend(SessionAdapters.list_claude_sessions())
+            sessions.extend(SessionAdapters.list_pi_sessions())
+            sessions.extend(SessionAdapters.list_opencode_sessions())
+            sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+
+            if not sessions:
+                console.print("[yellow]No previous sessions found to resume. Starting new session.[/yellow]")
+            elif not sys.stdin.isatty():
+                # Non-interactive fallback: resume latest
+                resumed_session = SessionManager.get_latest_session()
+            else:
+                curr_branch = None
+                try:
+                    r = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=str(Path.cwd()), capture_output=True, text=True, timeout=1)
+                    if r.returncode == 0:
+                        curr_branch = r.stdout.strip()
+                except Exception:
+                    pass
+
+                temp_ui = TerminalUI()
+                action_res = await temp_ui.interactive_session_picker(
+                    sessions,
+                    current_workspace=Path.cwd(),
+                    current_branch=curr_branch,
+                )
+                if action_res and action_res.get("action"):
+                    act = action_res.get("action")
+                    sess_meta = action_res.get("session") or {}
+                    target_id = sess_meta.get("id") or sess_meta.get("session_id")
+                    target_source = (sess_meta.get("agent") or sess_meta.get("source") or "cyc").lower()
+
+                    if act == "resume":
+                        if target_source == "cyc":
+                            resumed_session = SessionManager.find_session(target_id)
+                        elif target_source == "agy":
+                            clean_q = target_id[4:] if target_id.startswith("agy_") else target_id
+                            resumed_session = SessionAdapters.import_agy_session(clean_q)
+                        elif target_source == "claude":
+                            clean_q = target_id[7:] if target_id.startswith("claude_") else target_id
+                            resumed_session = SessionAdapters.import_claude_session(clean_q)
+                        elif target_source == "pi":
+                            clean_q = target_id[3:] if target_id.startswith("pi_") else target_id
+                            resumed_session = SessionAdapters.import_pi_session(clean_q)
+                        elif target_source == "opencode":
+                            clean_q = target_id[9:] if target_id.startswith("opencode_") else target_id
+                            resumed_session = SessionAdapters.import_opencode_session(clean_q)
+                    elif act == "rename":
+                        new_t = action_res.get("new_title") or action_res.get("title")
+                        if new_t and target_id:
+                            if target_source == "cyc":
+                                t_sess = SessionManager.find_session(target_id)
+                                if t_sess:
+                                    t_sess.rename(new_t)
+                                    resumed_session = t_sess
+                            else:
+                                console.print(f"[yellow]Renaming external session '{target_source}' is not supported yet.[/yellow]")
+                    elif act == "delete":
+                        if target_source == "cyc":
+                            SessionManager.delete_session(target_id)
+                            console.print(f"[bold green]✓ Session deleted:[/bold green] {target_id}")
+                            return
+                        else:
+                            console.print(f"[yellow]Deleting external session from '{target_source}' is not supported directly in cyc.[/yellow]")
+                            return
+                else:
+                    # User pressed Esc/Cancel in picker
+                    return
+
+        elif args.resume == "LATEST":
             resumed_session = SessionManager.get_latest_session()
             if not resumed_session:
                 agy_list = SessionAdapters.list_agy_sessions()

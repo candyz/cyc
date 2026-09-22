@@ -4,12 +4,18 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.application import Application
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
-from prompt_toolkit.formatted_text import HTML, AnyFormattedText
+from prompt_toolkit.formatted_text import HTML, AnyFormattedText, to_formatted_text
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.layout import Layout, HSplit, VSplit, Window
+from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+from prompt_toolkit.styles import Style
+from prompt_toolkit.widgets import Box, Frame, Label
 from rich.box import ROUNDED
 from rich.console import Console
 from rich.live import Live
@@ -317,77 +323,360 @@ class TerminalUI:
             )
         self.console.print(table)
 
-    async def interactive_session_picker(self, sessions: List[Dict]) -> Optional[Dict[str, Any]]:
-        """Interactive session selector with Resume, Rename, and Delete actions.
-        Returns a dict e.g. {"action": "resume"|"rename"|"delete", "session": s, "new_title": ...} or None.
+    async def interactive_session_picker(
+        self,
+        sessions: List[Dict],
+        current_workspace: Optional[Path] = None,
+        current_branch: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Claude Code style interactive Session Browser with real-time search and rich hotkeys.
+
+        Features:
+        - Search bar with live query filtering
+        - Space: toggle preview drawer
+        - Ctrl+R: rename session
+        - Ctrl+D: delete session
+        - Ctrl+A: show all sessions (across all workspaces/branches)
+        - Ctrl+B: filter to current git branch only
+        - Ctrl+P: filter to current project/workspace only
+        - Up/Down / PageUp/PageDown: navigation
+        - Enter: resume selected session
+        - Esc / Ctrl+C: cancel
         """
         if not sessions:
             self.console.print("[yellow]No sessions available to manage.[/yellow]")
             return None
 
-        from prompt_toolkit.shortcuts import radiolist_dialog, button_dialog, input_dialog, yes_no_dialog
+        # Check non-interactive terminal
+        if not sys.stdin.isatty():
+            self.console.print("[yellow]Interactive session picker requires a TTY terminal.[/yellow]")
+            return None
 
-        # Prepare values for radiolist: (session_dict, display_label)
-        values = []
-        for s in sessions:
-            agent = s.get("agent", "cyc").upper()
-            sid = s.get("id") or s.get("session_id", "")
-            title = s.get("title") or s.get("preview") or sid
-            if len(title) > 42:
-                title = title[:39] + "..."
-            msgs = s.get("message_count", 0)
-            label = f"[{agent}] {title} ({msgs} msgs) - {sid[:18]}"
-            values.append((s, label))
+        from prompt_toolkit.shortcuts import input_dialog, yes_no_dialog
+
+        cwd_path = str((current_workspace or Path.cwd()).resolve())
+        curr_branch = current_branch or ""
+
+        # Filter state
+        filter_mode = "all"  # "all", "branch", "project"
+        selected_index = 0
+        show_preview = False
+
+        search_buf = Buffer()
+
+        def get_filtered_sessions() -> List[Dict]:
+            query = search_buf.text.strip().lower()
+            filtered = []
+            for s in sessions:
+                # Filter by branch / project if requested
+                s_branch = s.get("git_branch", "")
+                s_ws = s.get("workspace", "")
+
+                if filter_mode == "branch":
+                    if curr_branch and s_branch != curr_branch:
+                        continue
+                elif filter_mode == "project":
+                    if cwd_path and s_ws != cwd_path:
+                        continue
+
+                if not query:
+                    filtered.append(s)
+                    continue
+
+                # Match search query against session ID, title, agent, preview, workspace, git_branch
+                sid = (s.get("id") or s.get("session_id") or "").lower()
+                title = (s.get("title") or "").lower()
+                agent = (s.get("agent") or "").lower()
+                preview = (s.get("preview") or "").lower()
+                ws_str = (s.get("workspace") or "").lower()
+                br_str = (s.get("git_branch") or "").lower()
+
+                if (
+                    query in sid
+                    or query in title
+                    or query in agent
+                    or query in preview
+                    or query in ws_str
+                    or query in br_str
+                ):
+                    filtered.append(s)
+            return filtered
+
+        kb = KeyBindings()
+        result_action: Dict[str, Any] = {"action": None}
+
+        @kb.add("escape")
+        def _on_escape(event):
+            event.app.exit(result=None)
+
+        @kb.add("c-c")
+        def _on_ctrl_c(event):
+            event.app.exit(result=None)
+
+        @kb.add("up")
+        def _on_up(event):
+            nonlocal selected_index
+            filtered = get_filtered_sessions()
+            if filtered:
+                selected_index = (selected_index - 1) % len(filtered)
+            event.app.invalidate()
+
+        @kb.add("down")
+        def _on_down(event):
+            nonlocal selected_index
+            filtered = get_filtered_sessions()
+            if filtered:
+                selected_index = (selected_index + 1) % len(filtered)
+            event.app.invalidate()
+
+        @kb.add("pageup")
+        def _on_pageup(event):
+            nonlocal selected_index
+            filtered = get_filtered_sessions()
+            if filtered:
+                selected_index = max(0, selected_index - 8)
+            event.app.invalidate()
+
+        @kb.add("pagedown")
+        def _on_pagedown(event):
+            nonlocal selected_index
+            filtered = get_filtered_sessions()
+            if filtered:
+                selected_index = min(len(filtered) - 1, selected_index + 8)
+            event.app.invalidate()
+
+        @kb.add("c-a")
+        def _on_ctrl_a(event):
+            nonlocal filter_mode, selected_index
+            filter_mode = "all"
+            selected_index = 0
+            event.app.invalidate()
+
+        @kb.add("c-b")
+        def _on_ctrl_b(event):
+            nonlocal filter_mode, selected_index
+            filter_mode = "branch" if filter_mode != "branch" else "all"
+            selected_index = 0
+            event.app.invalidate()
+
+        @kb.add("c-p")
+        def _on_ctrl_p(event):
+            nonlocal filter_mode, selected_index
+            filter_mode = "project" if filter_mode != "project" else "all"
+            selected_index = 0
+            event.app.invalidate()
+
+        @kb.add("space")
+        def _on_space(event):
+            nonlocal show_preview
+            # If search buffer is empty or user is navigating, space toggles preview
+            if not search_buf.text:
+                show_preview = not show_preview
+                event.app.invalidate()
+            else:
+                # When searching, insert space into search text
+                search_buf.insert_text(" ")
+
+        @kb.add("enter")
+        def _on_enter(event):
+            filtered = get_filtered_sessions()
+            if filtered and 0 <= selected_index < len(filtered):
+                result_action["action"] = "resume"
+                result_action["session"] = filtered[selected_index]
+                event.app.exit(result=result_action)
+
+        @kb.add("c-r")
+        def _on_ctrl_r(event):
+            filtered = get_filtered_sessions()
+            if filtered and 0 <= selected_index < len(filtered):
+                result_action["action"] = "rename"
+                result_action["session"] = filtered[selected_index]
+                event.app.exit(result=result_action)
+
+        @kb.add("c-d")
+        def _on_ctrl_d(event):
+            filtered = get_filtered_sessions()
+            if filtered and 0 <= selected_index < len(filtered):
+                result_action["action"] = "delete"
+                result_action["session"] = filtered[selected_index]
+                event.app.exit(result=result_action)
+
+        def render_header() -> List[tuple]:
+            mode_badge = f" [Filter: {filter_mode.upper()}] "
+            return [
+                ("class:title", " 📂  Resume or Manage Session (Claude Code style) "),
+                ("class:mode", mode_badge),
+                ("", "\n"),
+                ("class:help", " Search: Type to filter · "),
+                ("class:key", "↑/↓"),
+                ("class:help", " Navigate · "),
+                ("class:key", "Enter"),
+                ("class:help", " Resume · "),
+                ("class:key", "Space"),
+                ("class:help", f" {'Hide' if show_preview else 'Show'} Preview · "),
+                ("class:key", "Ctrl+R"),
+                ("class:help", " Rename · "),
+                ("class:key", "Ctrl+D"),
+                ("class:help", " Delete\n"),
+                ("class:key", " Ctrl+A"),
+                ("class:help", " All · "),
+                ("class:key", "Ctrl+B"),
+                ("class:help", f" Current Branch ({curr_branch or 'none'}) · "),
+                ("class:key", "Ctrl+P"),
+                ("class:help", f" Current Project · "),
+                ("class:key", "Esc"),
+                ("class:help", " Cancel\n"),
+                ("class:separator", "─" * 80 + "\n"),
+            ]
+
+        def render_session_list() -> List[tuple]:
+            nonlocal selected_index
+            filtered = get_filtered_sessions()
+            if not filtered:
+                return [("class:empty", "  (No sessions match the current query or filter)\n")]
+
+            if selected_index >= len(filtered):
+                selected_index = max(0, len(filtered) - 1)
+
+            # Calculate visible sliding window (max 10 items)
+            window_size = 8 if show_preview else 12
+            start = max(0, selected_index - window_size // 2)
+            end = min(len(filtered), start + window_size)
+            if end - start < window_size:
+                start = max(0, end - window_size)
+
+            tokens: List[tuple] = []
+            for idx in range(start, end):
+                s = filtered[idx]
+                is_sel = (idx == selected_index)
+
+                agent = (s.get("agent") or "cyc").upper()
+                sid = s.get("id") or s.get("session_id") or ""
+                title = s.get("title") or s.get("preview") or sid
+                if len(title) > 36:
+                    title = title[:33] + "..."
+                msgs = s.get("message_count", 0)
+                branch = s.get("git_branch") or ""
+                branch_tag = f" ⎇ {branch}" if branch else ""
+
+                mtime_raw = s.get("updated_at")
+                if mtime_raw:
+                    import datetime
+                    mtime_str = datetime.datetime.fromtimestamp(mtime_raw).strftime("%Y-%m-%d %H:%M")
+                else:
+                    mtime_str = "-"
+
+                prefix = " ► " if is_sel else "   "
+                item_class = "class:selected" if is_sel else "class:item"
+                agent_class = f"class:agent-{agent.lower()}" if not is_sel else "class:selected"
+
+                tokens.append((item_class, prefix))
+                tokens.append((agent_class, f"[{agent:<7}] "))
+                tokens.append((item_class, f"{title:<38} "))
+                tokens.append(("class:meta", f"({msgs:>2} msgs) {mtime_str} {branch_tag} - {sid[:18]}\n"))
+
+            scroll_info = f" Showing {start+1}-{end} of {len(filtered)} sessions "
+            tokens.append(("class:footer", f"\n{scroll_info:^80}\n"))
+            return tokens
+
+        def render_preview() -> List[tuple]:
+            if not show_preview:
+                return []
+            filtered = get_filtered_sessions()
+            if not filtered or not (0 <= selected_index < len(filtered)):
+                return [("class:preview-title", " Preview (no session selected)\n")]
+
+            s = filtered[selected_index]
+            sid = s.get("id") or s.get("session_id") or ""
+            title = s.get("title") or "(no title)"
+            agent = (s.get("agent") or "cyc").upper()
+            ws = s.get("workspace") or "(unknown)"
+            branch = s.get("git_branch") or "(none)"
+            preview = s.get("preview") or "(empty content)"
+
+            return [
+                ("class:separator", "─" * 80 + "\n"),
+                ("class:preview-title", f" 🔍  Preview: {title}\n"),
+                ("class:preview-meta", f"  Session ID: {sid} | Agent: {agent} | Branch: {branch}\n"),
+                ("class:preview-meta", f"  Workspace:  {ws}\n"),
+                ("class:preview-body", f"  Latest snippet: {preview[:120]}\n"),
+            ]
+
+        # Assemble layout
+        header_window = Window(FormattedTextControl(render_header), height=4)
+        search_prompt_window = Window(
+            BufferControl(buffer=search_buf),
+            height=1,
+            style="class:search-box",
+        )
+        list_window = Window(FormattedTextControl(render_session_list))
+        preview_window = Window(FormattedTextControl(render_preview))
+
+        root_container = HSplit([
+            header_window,
+            search_prompt_window,
+            list_window,
+            preview_window,
+        ])
+
+        custom_style = Style.from_dict({
+            "title": "bold bg:#0284c7 #ffffff",
+            "mode": "bold bg:#334155 #f8fafc",
+            "help": "#94a3b8",
+            "key": "bold #38bdf8",
+            "separator": "#334155",
+            "search-box": "bg:#1e293b #f8fafc underline",
+            "selected": "bold bg:#0284c7 #ffffff",
+            "item": "#f8fafc",
+            "agent-cyc": "bold #10b981",
+            "agent-agy": "bold #a855f7",
+            "agent-claude": "bold #f97316",
+            "agent-pi": "bold #eab308",
+            "agent-opencode": "bold #3b82f6",
+            "meta": "#64748b",
+            "footer": "dim #64748b",
+            "empty": "italic #eab308",
+            "preview-title": "bold #38bdf8",
+            "preview-meta": "#94a3b8",
+            "preview-body": "#e2e8f0",
+        })
+
+        app = Application(
+            layout=Layout(root_container),
+            key_bindings=kb,
+            style=custom_style,
+            full_screen=False,
+            mouse_support=False,
+        )
 
         try:
-            selected_session = await radiolist_dialog(
-                title="Session Manager (Claude Code style)",
-                text="Choose a session using Up/Down arrows and Enter:",
-                values=values,
-                ok_text="Select",
-                cancel_text="Cancel",
-            ).run_async()
+            picker_result = await app.run_async()
         except Exception as e:
             self.console.print(f"[bold red]Interactive session picker error:[/bold red] {e}")
             return None
 
-        if not selected_session:
+        if not picker_result or not picker_result.get("action"):
             return None
 
-        # Next, ask for action on selected session
-        sid = selected_session.get("id") or selected_session.get("session_id", "")
-        title = selected_session.get("title") or "(no title)"
-        try:
-            action = await button_dialog(
-                title=f"Manage: {title}",
-                text=f"Session ID: {sid}\nAgent: {selected_session.get('agent', 'cyc')}\nWhat would you like to do?",
-                buttons=[
-                    ("Resume", "resume"),
-                    ("Rename", "rename"),
-                    ("Delete", "delete"),
-                    ("Cancel", "cancel"),
-                ],
-            ).run_async()
-        except Exception:
-            return None
-
-        if not action or action == "cancel":
-            return None
+        action = picker_result.get("action")
+        target_s = picker_result.get("session") or {}
+        sid = target_s.get("id") or target_s.get("session_id") or ""
+        title = target_s.get("title") or "(no title)"
 
         if action == "rename":
             try:
                 new_title = await input_dialog(
                     title="Rename Session",
                     text=f"Current title: {title}\nEnter new title:",
-                    default=selected_session.get("title", ""),
+                    default=target_s.get("title", ""),
                 ).run_async()
             except Exception:
                 return None
             if new_title and new_title.strip():
-                return {"action": "rename", "session": selected_session, "new_title": new_title.strip()}
+                return {"action": "rename", "session": target_s, "new_title": new_title.strip()}
             return None
 
-        if action == "delete":
+        elif action == "delete":
             try:
                 confirmed = await yes_no_dialog(
                     title="Confirm Delete",
@@ -396,10 +685,10 @@ class TerminalUI:
             except Exception:
                 return None
             if confirmed:
-                return {"action": "delete", "session": selected_session}
+                return {"action": "delete", "session": target_s}
             return None
 
-        return {"action": "resume", "session": selected_session}
+        return {"action": "resume", "session": target_s}
 
     def print_tools_table(self, tools: List[Any]):
         table = Table(title=f"Registered Agent Tools ({len(tools)})", box=ROUNDED)

@@ -164,7 +164,7 @@ async def test_sessions_and_resume_slash_commands(tmp_path: Path):
 def test_parse_args_resume_and_sessions():
     with patch.object(sys, "argv", ["cyc", "-r"]):
         args = parse_args()
-        assert args.resume == "LATEST"
+        assert args.resume == "__INTERACTIVE__"
 
     with patch.object(sys, "argv", ["cyc", "--resume", "my_session_123"]):
         args = parse_args()
@@ -392,6 +392,24 @@ async def test_slash_command_sessions_subcommands(tmp_path):
     handled_manage = await app.handle_slash_command("/sessions manage")
     assert handled_manage is True
     assert app.ui.interactive_session_picker.called
+
+
+@pytest.mark.asyncio
+async def test_async_main_interactive_resume(tmp_path):
+    sess_dir = tmp_path / "sessions"
+    sess = SessionManager(session_id="interactive_pick_target", sessions_dir=sess_dir)
+    sess.add_user_message("Testing interactive picker")
+
+    with patch.object(sys, "argv", ["cyc", "-r"]):
+        with patch.object(sys.stdin, "isatty", return_value=True):
+            with patch("cyc.ui.TerminalUI.interactive_session_picker", new_callable=AsyncMock) as mock_picker:
+                mock_picker.return_value = {"action": "resume", "session": {"id": "interactive_pick_target", "agent": "cyc"}}
+                with patch("cyc.cli.CliApp.repl", new_callable=AsyncMock) as mock_repl:
+                    with patch("cyc.session.DEFAULT_SESSIONS_DIR", sess_dir):
+                        await async_main()
+                        assert mock_picker.called
+                        assert mock_repl.called
+
 
 
 
