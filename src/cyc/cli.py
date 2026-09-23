@@ -1000,11 +1000,53 @@ class CliApp:
 
     @contextmanager
     def fixed_status_bar_scroll_region(self):
-        """Safe execution context for model response turns.
-        Status bar information is cleanly displayed via prompt_toolkit bottom_toolbar
-        to prevent hardware terminal scrolling escape sequences from wiping responses.
+        """Pin status bar to the bottom terminal row during model/agent execution (lines 1..H-1 scroll).
+        On teardown, clears the status line row, resets scroll region, and positions cursor cleanly
+        at the bottom of the screen so that subsequent prompt_toolkit prompts never wipe history.
         """
-        yield
+        is_tty = sys.stdout.isatty() and hasattr(sys.stdout, "write")
+        term_size = shutil.get_terminal_size()
+        lines, cols = term_size.lines, term_size.columns
+
+        if not is_tty or lines < 4:
+            yield
+            return
+
+        try:
+            from rich.text import Text
+
+            # 1. Ensure cursor starts with a clean newline, reserve bottom line
+            sys.stdout.write("\n")
+            # Restrict scrolling region to lines 1..(lines - 1)
+            sys.stdout.write(f"\033[1;{lines-1}r")
+
+            # 2. Render status line markup padded to full width
+            markup = " " + self._get_status_line_markup()
+            txt = Text.from_markup(markup)
+            if txt.cell_len < cols:
+                txt.pad_right(cols)
+            with console.capture() as cap:
+                console.print(txt, end="")
+            status_line = cap.get()
+
+            # 3. Draw status line on the last row and position cursor at line lines-1
+            sys.stdout.write(f"\033[{lines};1H{status_line}\033[{lines-1};1H\n")
+            sys.stdout.flush()
+
+            yield
+        finally:
+            try:
+                # 4. Teardown:
+                # Clear the status bar on the bottom row
+                sys.stdout.write(f"\033[{lines};1H\033[2K")
+                # Reset scrolling region to full screen
+                sys.stdout.write("\033[r")
+                # Move cursor to the bottom row and emit newline to push prompt_toolkit down safely
+                sys.stdout.write(f"\033[{lines};1H\n")
+                sys.stdout.flush()
+            except Exception:
+                pass
+
 
 
     async def repl(self) -> None:
