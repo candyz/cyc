@@ -111,6 +111,8 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `fetch_url` | 唯讀 | **網頁擷取**：抓取 URL 網頁內容，智慧提取乾淨文字/Markdown 並自動截斷防爆 |
 | `ask_user` | 互動 | **互動澄清**：主動向使用者發起單選/多選/自由輸入問答，釐清模糊需求與架構決策 |
 | `repo_map` | 唯讀 | **代碼地圖**：基於 AST 與通用符號分析，輸出 classes, functions 緊湊拓撲樹 |
+| `manage_task` | 變更 | **背景任務**：非同步啟動長任務、檢視即時日誌輸出、列出狀態或停止執行緒 |
+| `invoke_subagent` | 代理 | **子代理調用**：在獨立對話上下文孵化子代理（調研、規劃、測試），防上下文污染 |
 | `MCP Tools` | 擴充 | 透過 Model Context Protocol 動態掛載之外部工具 |
 
 ### 3.1 互動澄清工具 (`ask_user`)
@@ -119,7 +121,17 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 ### 3.2 代碼庫拓撲地圖 (`repo_map`)
 透過原生 Python `ast` 模組以及通用 Regex 多語言符號解析器，`repo_map` 工具能在毫秒級內遍歷專案目錄，擷取 Python、JavaScript/TypeScript、Go、Rust 等主流語言的 Class、Function、Method、Interface 等核心定義符號，並以帶縮排與檔名的樹狀結構呈現。此地圖不僅能在 Agent 啟動時作為拓撲感知依據，亦可由 Agent 在探索複雜程式碼庫時按需呼叫。
 
-### 3.3 專案與全域規則體系 (Project Rules & System Prompts)
+### 3.3 子代理隔離分工機制 (`invoke_subagent`)
+在處理涉及大量文件檢索、架構調查或測試案例生成的複雜任務時，主代理可呼叫 `invoke_subagent` 將子任務委託給專用角色的子代理（如 `researcher`, `planner`, `tester`）。子代理運行於獨立的 Child Session 與專屬唯讀工具環境中，僅將最終濃縮結論回傳給主代理，有效避免主對話的 Context 空間被大量中間調研內容稀釋。
+
+### 3.4 背景任務與長任務非同步管理 (`manage_task`)
+針對需長時間執行的背景服務、大型建置或端到端測試，`manage_task` 提供了一套完整的進程管理介面：
+- `start`：非同步啟動 Shell 指令並返回 `task_id`，代理與終端不會被阻塞。
+- `list`：隨時查看所有背景任務的執行狀態、啟動時間與已緩衝日誌行數。
+- `output`：抓取指定任務的最新尾端輸出日誌（預設 50 行）。
+- `stop`：優雅終止或強制中斷背景任務。
+
+### 3.5 專案與全域規則體系 (Project Rules & System Prompts)
 `cyc` 具備多層級規則自動探索與合併機制（`RuleManager`）：
 - **全域規則**：置放於 `~/.config/cyc/rules/*.md`，適用於本機所有專案之通用編程標準與安全守則。
 - **專案規則**：優先識別工作區根目錄下的 `CYC.md`、`AGENTS.md`、`.gemini/GEMINI.md`、`.gemini/AGENTS.md`、`GEMINI.md`、`CLAUDE.md`、`.cursorrules` 等常見規範檔案。

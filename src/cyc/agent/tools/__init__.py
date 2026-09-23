@@ -11,9 +11,11 @@ from cyc.agent.tools.search import GrepSearchTool
 from cyc.agent.tools.web import WebSearchTool, FetchUrlTool
 from cyc.agent.tools.interaction import AskUserTool
 from cyc.agent.tools.repomap import RepoMapTool
+from cyc.agent.tools.tasks import TaskTool
+from cyc.agent.tools.subagent import SubagentTool
 
 def get_default_tools(searxng_url: Optional[str] = None) -> List[Tool]:
-    """Return an instantiated list of all 11 core built-in tools."""
+    """Return an instantiated list of all 13 core built-in tools."""
     return [
         ReadFileTool(),
         WriteFileTool(),
@@ -26,6 +28,8 @@ def get_default_tools(searxng_url: Optional[str] = None) -> List[Tool]:
         FetchUrlTool(),
         AskUserTool(),
         RepoMapTool(),
+        TaskTool(),
+        SubagentTool(),
     ]
 
 class ToolRegistry:
@@ -69,4 +73,6 @@ __all__ = [
     "FetchUrlTool",
     "AskUserTool",
     "RepoMapTool",
+    "TaskTool",
+    "SubagentTool",
 ]

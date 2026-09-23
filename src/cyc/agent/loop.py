@@ -38,6 +38,15 @@ class AgentLoop:
         self.strategy = strategy.lower()  # "standard", "plan", "minimal"
         self.event_callback = event_callback
 
+        # Wire SubagentRunner into invoke_subagent tool if registered
+        try:
+            sub_tool = self.tool_registry.get("invoke_subagent")
+            from cyc.agent.subagent import SubagentRunner
+            if hasattr(sub_tool, "runner") and sub_tool.runner is None:
+                sub_tool.set_runner(SubagentRunner(provider=self.provider, default_model=self.model))
+        except KeyError:
+            pass
+
     async def _emit(self, event_type: str, data: Optional[Dict[str, Any]] = None):
         """Emit an event to the registered event_callback if any."""
         if self.event_callback:

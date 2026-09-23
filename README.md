@@ -14,6 +14,8 @@
   - **核心工具集**：內建 `read_file`, `write_file`, `replace_file_content`（精準置換＋紅綠 Unified Diff 審批）、`run_command`, `list_dir`, `grep_search`。
   - **互動澄清與決策工具 (`ask_user`)**：Agent 在需求模糊或架構選型時可主動發起單選/多選/自由輸入澄清問答，終端互動選單渲染，避免臆測需求。
   - **代碼庫拓撲地圖 (`repo_map`)**：基於 AST 與通用符號分析，自動抽取專案中 classes、functions、methods 結構地圖，精準掌握工程拓撲。
+  - **子代理隔離分工體系 (`invoke_subagent`)**：支援將龐大調研、架構規劃或測試分析分派至獨立上下文子代理執行，保護主對話 Context 不受干擾。
+  - **長任務非同步管理 (`manage_task`)**：背景啟動長時間建置、測試或伺服器程序，隨時查詢緩衝日誌與控制生命週期，不鎖死終端。
   - **多層級專案規則體系 (Project Rules)**：自動探索與合併全域規則（`~/.config/cyc/rules/*.md`）與專案規則（`CYC.md`, `AGENTS.md`, `CLAUDE.md`, `.cursorrules` 等），支援防爆預算截斷。
   - **PTC 程式化工具呼叫 (Programmatic Tool-Calling)**：透過 `run_script` 支援以單一 Turn 執行 Python / Bash 多步驟管線運算，顯著節省多輪 API 呼叫。
   - **可插拔 Loop 決策策略 (`/loop`)**：支援動態切換 `standard` (多回合 ReAct)、`plan` (先規劃後執行)、`minimal` (3 輪評測/快跑)，預設 100 turns。

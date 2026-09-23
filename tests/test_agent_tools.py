@@ -108,10 +108,10 @@ async def test_grep_search(tmp_path: Path):
 
 def test_tool_registry():
     registry = ToolRegistry()
-    assert len(registry.all_tools()) == 11
+    assert len(registry.all_tools()) == 13
 
     openai_tools = registry.to_openai_tools()
-    assert len(openai_tools) == 11
+    assert len(openai_tools) == 13
     names = [t["function"]["name"] for t in openai_tools]
     assert "read_file" in names
     assert "write_file" in names
@@ -121,12 +121,16 @@ def test_tool_registry():
     assert "fetch_url" in names
     assert "ask_user" in names
     assert "repo_map" in names
+    assert "manage_task" in names
+    assert "invoke_subagent" in names
 
     gemini_tools = registry.to_gemini_tools()
-    assert len(gemini_tools) == 11
+    assert len(gemini_tools) == 13
     gemini_names = [t["name"] for t in gemini_tools]
     assert "ask_user" in gemini_names
     assert "repo_map" in gemini_names
+    assert "manage_task" in gemini_names
+    assert "invoke_subagent" in gemini_names
     assert "replace_file_content" in gemini_names
     assert "web_search" in gemini_names
     assert "fetch_url" in gemini_names
