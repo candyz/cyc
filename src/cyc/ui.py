@@ -818,6 +818,7 @@ class TerminalUI:
                 self.console.print(Markdown(rest_content))
         else:
             self.console.print(Markdown(text))
+        self.console.print()
 
     async def stream_response(
         self,

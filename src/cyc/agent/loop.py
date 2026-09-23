@@ -197,6 +197,7 @@ class AgentLoop:
                         self.ui.render_formatted_response(final_content)
                     else:
                         console.print(Markdown(final_content))
+                    console.print()
                     self.session.add_assistant_message(final_content)
                 break
 

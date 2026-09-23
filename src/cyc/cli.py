@@ -1022,8 +1022,8 @@ class CliApp:
             yield
         finally:
             try:
-                # Reset scrolling region to full screen
-                sys.stdout.write("\033[r")
+                # Reposition cursor above status bar, reset scrolling region to full screen, and emit newline
+                sys.stdout.write(f"\033[{lines-1};1H\033[r\n")
                 sys.stdout.flush()
             except Exception:
                 pass
