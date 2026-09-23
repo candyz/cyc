@@ -9,7 +9,7 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
-from prompt_toolkit.filters import is_done
+from prompt_toolkit.filters import Condition, is_done
 from prompt_toolkit.formatted_text import HTML, AnyFormattedText, to_formatted_text
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
@@ -1008,6 +1008,19 @@ def create_prompt_session(
         import shutil
 
         old_layout = session.app.layout
+
+        # In prompt_toolkit's default layout, default_buffer_window does not set dont_extend_height,
+        # which causes HSplit to greedily expand the input window to consume all available vertical space,
+        # leaving empty blank rows between user input and the bottom toolbar.
+        # By setting dont_extend_height=True on default_buffer_window, the input window sizes tightly
+        # to its exact content lines (1 row for single-line, N rows for multi-line), while top_filler
+        # absorbs all extra space above it, pinning the input line right above the bottom statusline.
+        try:
+            fc = old_layout.container.children[0].alternative_content
+            buf_win = fc.content.children[1].content
+            buf_win.dont_extend_height = Condition(lambda: True)
+        except Exception:
+            pass
 
         def get_top_filler_height():
             lines = shutil.get_terminal_size().lines
