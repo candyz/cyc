@@ -56,14 +56,22 @@
 
 ### 1. 安裝
 
-您可以透過 `uv` 或 `pipx` 將 `cyc` 安裝為系統全域工具：
-
+#### ⚡ 一鍵安裝 (推薦，macOS / Linux)
+只需在終端執行以下指令，自動檢查環境並完成安裝：
 ```bash
-# 透過 uv tool 全域安裝 (推薦)
-uv tool install --force .
+curl -fsSL https://raw.githubusercontent.com/candyz/cyc/main/install.sh | bash
+```
 
-# 或是本機開發除錯
-uv sync
+#### 📦 手動全域安裝 (若已安裝 uv / pipx)
+```bash
+# 透過 uv tool 直接從 GitHub 安裝 (極速推薦)
+uv tool install --force git+https://github.com/candyz/cyc.git
+
+# 或是透過 pipx 安裝
+pipx install --force git+https://github.com/candyz/cyc.git
+
+# 或是從本機原始碼目錄安裝 (本機開發)
+uv tool install --force .
 ```
 
 ### 2. 初始化設定
