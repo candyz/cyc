@@ -134,13 +134,121 @@ class AntigravityProvider(BaseProvider):
         except Exception:
             return DEFAULT_AGY_MODELS
 
+    @staticmethod
+    def format_reset_time(seconds: float) -> str:
+        s = int(seconds)
+        if s <= 0:
+            return "0m"
+        d = s // 86400
+        h = (s % 86400) // 3600
+        m = (s % 3600) // 60
+        if d > 0:
+            return f"{d}d {h}h"
+        if h > 0:
+            return f"{h}h {m}m"
+        return f"{m}m"
+
+    @classmethod
+    def get_quota_info(cls, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Read and parse 5h and 7d quota information for the specified model from cached statusline JSON."""
+        from pathlib import Path
+
+        candidates = [
+            Path.home() / ".gemini" / "antigravity-cli" / "cache" / "statusline_input.json",
+            Path("/tmp/statusline_input.json"),
+        ]
+        data = None
+        for p in candidates:
+            if p.exists():
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                    if data and isinstance(data, dict) and "quota" in data:
+                        break
+                except Exception:
+                    data = None
+
+        if not data or not isinstance(data.get("quota"), dict):
+            return None
+
+        quota_dict = data["quota"]
+        model_str = (model or "").lower()
+
+        # Determine filtering keyword: 'gemini' vs '3p'
+        if "gemini" in model_str:
+            kw = "gemini"
+        elif any(k in model_str for k in ("claude", "gpt", "sonnet", "3p")):
+            kw = "3p"
+        else:
+            default_id = str(data.get("model", {}).get("id", "")).lower()
+            kw = "gemini" if "gemini" in default_id else "3p"
+
+        # Filter buckets containing the keyword with valid remaining_fraction & reset_in_seconds
+        valid_items = []
+        for k, v in quota_dict.items():
+            if isinstance(v, dict) and v.get("remaining_fraction") is not None and v.get("reset_in_seconds") is not None:
+                valid_items.append((k, v))
+
+        filtered = [it for it in valid_items if kw in it[0].lower()]
+        items_to_use = filtered if filtered else valid_items
+        if not items_to_use:
+            return None
+
+        # Sort by reset_in_seconds ascending: short window (5h) first, long window (7d) second
+        items_to_use.sort(key=lambda it: it[1].get("reset_in_seconds", 0))
+
+        res: Dict[str, Any] = {
+            "plan_tier": data.get("plan_tier", "Google AI Pro"),
+            "keyword": kw,
+        }
+
+        if len(items_to_use) >= 1:
+            k1, v1 = items_to_use[0]
+            rem_frac1 = float(v1.get("remaining_fraction", 1.0))
+            reset_secs1 = float(v1.get("reset_in_seconds", 0))
+            used1 = max(0, min(100, round((1.0 - rem_frac1) * 100)))
+            res["5h"] = {
+                "name": k1,
+                "used_pct": used1,
+                "remaining_pct": 100 - used1,
+                "reset_seconds": reset_secs1,
+                "reset_str": cls.format_reset_time(reset_secs1),
+            }
+
+        if len(items_to_use) >= 2:
+            k2, v2 = items_to_use[1]
+            rem_frac2 = float(v2.get("remaining_fraction", 1.0))
+            reset_secs2 = float(v2.get("reset_in_seconds", 0))
+            used2 = max(0, min(100, round((1.0 - rem_frac2) * 100)))
+            res["7d"] = {
+                "name": k2,
+                "used_pct": used2,
+                "remaining_pct": 100 - used2,
+                "reset_seconds": reset_secs2,
+                "reset_str": cls.format_reset_time(reset_secs2),
+            }
+
+        return res
+
     async def get_usage_info(self, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
         binary_available = bool(shutil.which(self.binary_path))
-        return {
+        quota = self.get_quota_info(model)
+        plan = (quota.get("plan_tier") if quota else None) or "Pro"
+        tier = f"{plan} (Gemini AI Pro Subscription / Google Workspace)"
+
+        rate_limit_desc = "Pro Subscription Quota (Managed by Google AGY)"
+        if quota and "5h" in quota and "7d" in quota:
+            q5 = quota["5h"]
+            q7 = quota["7d"]
+            rate_limit_desc = f"5h: {q5['used_pct']}% used (↻ {q5['reset_str']}) | 7d: {q7['used_pct']}% used (↻ {q7['reset_str']})"
+
+        info = {
             "provider": "Google Antigravity (agy)",
-            "tier": "Gemini AI Pro Subscription / Google Workspace",
+            "tier": tier,
             "model": model or "gemini-3.1-pro-high",
-            "rate_limit": "Pro Subscription Quota (Managed by Google AGY)",
+            "rate_limit": rate_limit_desc,
             "local_binary": "Installed" if binary_available else "Not Found",
         }
+        if quota:
+            info["quota"] = quota
+        return info
 

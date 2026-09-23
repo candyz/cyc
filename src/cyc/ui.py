@@ -822,10 +822,29 @@ class TerminalUI:
 
         if provider_info:
             for k, v in provider_info.items():
-                if k in ("provider", "model"):
+                if k in ("provider", "model", "quota"):
                     continue
                 label = k.replace("_", " ").title()
                 table.add_row("Provider Limits", label, str(v))
+
+            if "quota" in provider_info:
+                q = provider_info["quota"]
+                if "5h" in q:
+                    q5 = q["5h"]
+                    u = q5["used_pct"]
+                    c = "red" if u >= 80 else ("yellow" if u >= 50 else "green")
+                    filled = int(u / 10)
+                    empty = 10 - filled
+                    bar = f"[{c}]{'█' * filled}{'░' * empty}[/{c}]"
+                    table.add_row("Rate Limits (Quota)", f"5h Window ({q5['name']})", f"{bar} [{c}]{u}% used[/{c}] (↻ resets in {q5['reset_str']})")
+                if "7d" in q:
+                    q7 = q["7d"]
+                    u = q7["used_pct"]
+                    c = "red" if u >= 80 else ("yellow" if u >= 50 else "green")
+                    filled = int(u / 10)
+                    empty = 10 - filled
+                    bar = f"[{c}]{'█' * filled}{'░' * empty}[/{c}]"
+                    table.add_row("Rate Limits (Quota)", f"7d Window ({q7['name']})", f"{bar} [{c}]{u}% used[/{c}] (↻ resets in {q7['reset_str']})")
         else:
             table.add_row("Provider Limits", "Account Status", "[dim]Local / Standalone API (No external quota API)[/dim]")
 

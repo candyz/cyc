@@ -250,3 +250,86 @@ async def test_retry_async_success_after_transient_error():
         assert res == "success!"
         assert attempts == 3
         assert mock_sleep.call_count == 2
+
+
+def test_agy_format_reset_time():
+    assert AntigravityProvider.format_reset_time(0) == "0m"
+    assert AntigravityProvider.format_reset_time(45) == "0m"
+    assert AntigravityProvider.format_reset_time(125) == "2m"
+    assert AntigravityProvider.format_reset_time(3660) == "1h 1m"
+    assert AntigravityProvider.format_reset_time(90000) == "1d 1h"
+
+
+def test_agy_get_quota_info(tmp_path):
+    mock_json = {
+        "model": {"id": "gemini-3.1-pro-high"},
+        "plan_tier": "Google AI Pro",
+        "quota": {
+            "gemini-5h": {"remaining_fraction": 0.40, "reset_in_seconds": 7200},
+            "gemini-weekly": {"remaining_fraction": 0.85, "reset_in_seconds": 345600},
+            "3p-5h": {"remaining_fraction": 0.75, "reset_in_seconds": 3600},
+            "3p-weekly": {"remaining_fraction": 0.90, "reset_in_seconds": 518400},
+        }
+    }
+    cache_dir = tmp_path / ".gemini" / "antigravity-cli" / "cache"
+    cache_dir.mkdir(parents=True)
+    cache_file = cache_dir / "statusline_input.json"
+    import json
+    cache_file.write_text(json.dumps(mock_json), encoding="utf-8")
+
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        # 1. Gemini model -> matches gemini buckets
+        q_gemini = AntigravityProvider.get_quota_info("gemini-3.1-pro-high")
+        assert q_gemini is not None
+        assert q_gemini["keyword"] == "gemini"
+        assert q_gemini["5h"]["used_pct"] == 60
+        assert q_gemini["5h"]["reset_str"] == "2h 0m"
+        assert q_gemini["7d"]["used_pct"] == 15
+        assert q_gemini["7d"]["reset_str"] == "4d 0h"
+
+        # 2. Claude / 3p model -> matches 3p buckets
+        q_claude = AntigravityProvider.get_quota_info("claude-sonnet-4-6")
+        assert q_claude is not None
+        assert q_claude["keyword"] == "3p"
+        assert q_claude["5h"]["used_pct"] == 25
+        assert q_claude["5h"]["reset_str"] == "1h 0m"
+        assert q_claude["7d"]["used_pct"] == 10
+        assert q_claude["7d"]["reset_str"] == "6d 0h"
+
+
+def test_cli_agy_quota_statusline_badges(tmp_path):
+    from cyc.cli import CliApp
+    from cyc.config import Config, ProviderConfig
+    import json
+
+    mock_json = {
+        "model": {"id": "gemini-3.1-pro-high"},
+        "plan_tier": "Google AI Pro",
+        "quota": {
+            "gemini-5h": {"remaining_fraction": 0.40, "reset_in_seconds": 7200},
+            "gemini-weekly": {"remaining_fraction": 0.85, "reset_in_seconds": 345600},
+        }
+    }
+    cache_dir = tmp_path / ".gemini" / "antigravity-cli" / "cache"
+    cache_dir.mkdir(parents=True)
+    cache_file = cache_dir / "statusline_input.json"
+    cache_file.write_text(json.dumps(mock_json), encoding="utf-8")
+
+    cfg = Config(
+        default_provider="agy",
+        default_model="gemini-3.1-pro-high",
+        providers={"agy": ProviderConfig(type="agy")},
+    )
+    app = CliApp(cfg, provider_name="agy", model_name="gemini-3.1-pro-high")
+
+    with patch("pathlib.Path.home", return_value=tmp_path):
+        # In wide terminal: contains countdown
+        badge_wide = app._get_agy_quota_badges(is_html=False, cols=120)
+        assert "5h: 60% (↻ 2h 0m)" in badge_wide
+        assert "7d: 15% (↻ 4d 0h)" in badge_wide
+
+        # In compact terminal: countdown omitted
+        badge_compact = app._get_agy_quota_badges(is_html=False, cols=80)
+        assert "5h: 60%" in badge_compact
+        assert "(↻" not in badge_compact
+

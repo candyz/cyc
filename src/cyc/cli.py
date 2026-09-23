@@ -942,6 +942,46 @@ class CliApp:
             return True
         return False
 
+    def _get_agy_quota_badges(self, is_html: bool = False, cols: int = 120) -> str:
+        """Generate formatted 5h and 7d usage badge strings for agy provider."""
+        if self.provider_name.lower() != "agy":
+            return ""
+
+        from cyc.providers.agy import AntigravityProvider
+        quota = AntigravityProvider.get_quota_info(self.model)
+        if not quota or ("5h" not in quota and "7d" not in quota):
+            return ""
+
+        parts = []
+        compact = cols < 95
+
+        def color_tag(pct: int, text: str) -> str:
+            if is_html:
+                c = "ansired" if pct >= 80 else ("ansiyellow" if pct >= 50 else "ansigreen")
+                return f"<style fg='{c}'>{text}</style>"
+            else:
+                c = "red" if pct >= 80 else ("yellow" if pct >= 50 else "green")
+                return f"[{c}]{text}[/{c}]"
+
+        if "5h" in quota:
+            q = quota["5h"]
+            u = q["used_pct"]
+            r = q["reset_str"]
+            lbl = f"5h: {u}%" if compact else f"5h: {u}% (↻ {r})"
+            parts.append(color_tag(u, lbl))
+
+        if "7d" in quota:
+            q = quota["7d"]
+            u = q["used_pct"]
+            r = q["reset_str"]
+            lbl = f"7d: {u}%" if compact else f"7d: {u}% (↻ {r})"
+            parts.append(color_tag(u, lbl))
+
+        if not parts:
+            return ""
+
+        return " | " + " | ".join(parts)
+
     def _get_status_toolbar(self) -> HTML:
         """Generate status bar displayed at the bottom of the prompt."""
         if self.is_workspace_trusted is False:
@@ -955,12 +995,15 @@ class CliApp:
         limit = self.session.max_context_tokens
         token_str = f"{tokens}/{limit}"
         project_name = self.workspace_path.name or str(self.workspace_path)
+        cols = shutil.get_terminal_size().columns
+        quota_badge = self._get_agy_quota_badges(is_html=True, cols=cols)
 
         status_text = (
             f" <style fg='ansibrightyellow'>{project_name}</style> | "
             f"<b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
             f"<style fg='ansigreen'>{self.provider_name}</style> | "
             f"<style fg='ansicyan'>{self.model}</style>"
+            f"{quota_badge}"
             f"{trust_badge} "
         )
         return HTML(status_text)
@@ -977,12 +1020,15 @@ class CliApp:
         limit = self.session.max_context_tokens
         token_str = f"{tokens}/{limit}"
         project_name = self.workspace_path.name or str(self.workspace_path)
+        cols = shutil.get_terminal_size().columns
+        quota_badge = self._get_agy_quota_badges(is_html=False, cols=cols)
 
         return (
             f"[bright_yellow]{project_name}[/bright_yellow] | "
             f"[bold]Context:[/bold] [yellow]{token_str}[/yellow] | "
             f"[green]{self.provider_name}[/green] | "
             f"[cyan]{self.model}[/cyan]"
+            f"{quota_badge}"
             f"{trust_badge}"
         )
 
