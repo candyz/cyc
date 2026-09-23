@@ -8,7 +8,7 @@ _cyc_completion() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent --chat -y --yes --read-only -r --resume --sessions --trust --no-trust --completion --web --port --host --token --no-open --update init web update bot"
+    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent --chat -y --yes --read-only -r --resume --max-turns --sessions --trust --no-trust --completion --web --port --host --token --no-open --bot --bot-token -u --update init web update bot"
     providers="ollama openrouter omlx nvidia gemini agy opencode"
 
     case "${prev}" in
@@ -33,7 +33,7 @@ _cyc_completion() {
             COMPREPLY=( $(compgen -W "bash zsh" -- "${cur}") )
             return 0
             ;;
-        -m|--model|-s|--system|--port|--host|--token)
+        -m|--model|-s|--system|--port|--host|--token|--max-turns|--bot-token)
             # Freeform text/numbers
             return 0
             ;;
@@ -65,6 +65,7 @@ _cyc() {
         '(-y --yes)'{-y,--yes}'[Auto-approve all tool actions without interactive prompt]'
         '--read-only[Block all mutation tools (write_file, replace, run_command)]'
         '(-r --resume)'{-r,--resume}'[Resume a previous session by ID/prefix (or latest)]'
+        '--max-turns[Maximum number of turns for Agent loop]:max turns:'
         '--sessions[List all saved chat & agent sessions and exit]'
         '--trust[Explicitly trust current workspace without prompting]'
         '--no-trust[Explicitly restrict current workspace (force Read-Only mode)]'
@@ -74,7 +75,9 @@ _cyc() {
         '--host[Host address to bind for Web interface]:host:'
         '--token[Authentication token for Web interface]:token:'
         '--no-open[Do not automatically open the browser]'
-        '--update[Check for updates and automatically upgrade cyc]'
+        '--bot[Launch the cyc Chatbot Gateway (e.g. Telegram)]'
+        '--bot-token[Bot API token (overrides config)]:bot token:'
+        '(-u --update)'{-u,--update}'[Check for updates and automatically upgrade cyc]'
         '*:prompt:_files'
     )
     _arguments -s $opts

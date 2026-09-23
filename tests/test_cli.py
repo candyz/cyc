@@ -471,6 +471,22 @@ async def test_update_command_and_slash():
             mock_update.assert_awaited_with(force=False)
 
 
+def test_completion_script_includes_u_flag():
+    from cyc.completion import get_completion_script
+
+    bash_script = get_completion_script("bash")
+    assert "-u" in bash_script
+    assert "--update" in bash_script
+    assert "--max-turns" in bash_script
+    assert "--bot" in bash_script
+
+    zsh_script = get_completion_script("zsh")
+    assert "(-u --update)" in zsh_script
+    assert "--max-turns" in zsh_script
+    assert "--bot" in zsh_script
+
+
+
 
 
 
