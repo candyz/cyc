@@ -1002,6 +1002,7 @@ def create_prompt_session(
         multiline=multiline,
         bottom_toolbar=bottom_toolbar,
         style=toolbar_style,
+        reserve_space_for_menu=0 if docked else 8,
     )
 
     if docked:
