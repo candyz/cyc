@@ -7,6 +7,7 @@
 
 import json
 import re
+import shutil
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -637,6 +638,117 @@ class SessionAdapters:
             return session
         except Exception:
             return None
+
+    # ------------------------------------------------------------------
+    # External Session Deletion Helpers
+    # ------------------------------------------------------------------
+    @classmethod
+    def delete_agy_session(cls, query: str, brain_dir: Optional[Path] = None) -> bool:
+        """Delete an AGY conversation directory and transcript."""
+        target_dir = brain_dir or AGY_BRAIN_DIR
+        sessions = cls.list_agy_sessions(brain_dir=target_dir)
+        matched = None
+        for s in sessions:
+            if s["id"] == query or s["id"].startswith(query):
+                matched = s
+                break
+        if not matched:
+            conv_dir = target_dir / query
+            if conv_dir.exists() and conv_dir.is_dir():
+                shutil.rmtree(conv_dir, ignore_errors=True)
+                return True
+            return False
+
+        conv_path = Path(matched["file_path"]).parent.parent.parent
+        if conv_path.exists() and conv_path.is_dir():
+            shutil.rmtree(conv_path, ignore_errors=True)
+            return True
+        return False
+
+    @classmethod
+    def delete_claude_session(cls, query: str, projects_dir: Optional[Path] = None) -> bool:
+        """Delete a Claude Code session .jsonl file."""
+        target_dir = projects_dir or CLAUDE_PROJECTS_DIR
+        sessions = cls.list_claude_sessions(projects_dir=target_dir)
+        matched = None
+        for s in sessions:
+            if s["id"] == query or s["id"].startswith(query):
+                matched = s
+                break
+        if not matched:
+            return False
+
+        file_path = Path(matched["file_path"])
+        if file_path.exists():
+            file_path.unlink()
+            return True
+        return False
+
+    @classmethod
+    def delete_pi_session(cls, query: str, sessions_dir: Optional[Path] = None) -> bool:
+        """Delete a Pi Agent session .jsonl file."""
+        target_dir = sessions_dir or PI_SESSIONS_DIR
+        sessions = cls.list_pi_sessions(sessions_dir=target_dir)
+        matched = None
+        for s in sessions:
+            if s["id"] == query or s["id"].startswith(query):
+                matched = s
+                break
+        if not matched:
+            return False
+
+        file_path = Path(matched["file_path"])
+        if file_path.exists():
+            file_path.unlink()
+            return True
+        return False
+
+    @classmethod
+    def delete_opencode_session(cls, query: str, db_path: Optional[Path] = None) -> bool:
+        """Delete an OpenCode session from opencode.db SQLite database."""
+        target_db = db_path or OPENCODE_DB_PATH
+        if not target_db.exists():
+            return False
+
+        sessions = cls.list_opencode_sessions(db_path=target_db)
+        matched = None
+        for s in sessions:
+            if s["id"] == query or s["id"].startswith(query):
+                matched = s
+                break
+        if not matched:
+            return False
+
+        target_id = matched["id"]
+        try:
+            conn = sqlite3.connect(str(target_db))
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON;")
+            cursor.execute("DELETE FROM session WHERE id = ?", (target_id,))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception:
+            return False
+
+    @classmethod
+    def delete_external_session(cls, agent: str, session_id: str) -> bool:
+        """Dispatch deletion of external agent session."""
+        ag = (agent or "").lower()
+        if ag == "agy":
+            clean_q = session_id[4:] if session_id.startswith("agy_") else session_id
+            return cls.delete_agy_session(clean_q)
+        elif ag == "claude":
+            clean_q = session_id[7:] if session_id.startswith("claude_") else session_id
+            return cls.delete_claude_session(clean_q)
+        elif ag == "pi":
+            clean_q = session_id[3:] if session_id.startswith("pi_") else session_id
+            return cls.delete_pi_session(clean_q)
+        elif ag == "opencode":
+            clean_q = session_id[9:] if session_id.startswith("opencode_") else session_id
+            return cls.delete_opencode_session(clean_q)
+        return False
 
     # ------------------------------------------------------------------
     # Two-Way Write-Back Bridge (Sync Back to External Agents)

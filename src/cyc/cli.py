@@ -473,9 +473,7 @@ class CliApp:
                         # Loop back to picker
                         continue
                     elif act == "delete":
-                        if source != "cyc":
-                            console.print(f"[yellow]Deleting external session from '{source}' is not supported directly in cyc.[/yellow]")
-                        else:
+                        if source == "cyc":
                             if self.session.session_id == sess_id:
                                 console.print("[bold yellow]Cannot delete currently active session.[/bold yellow]")
                             else:
@@ -484,6 +482,12 @@ class CliApp:
                                     console.print(f"[bold green]✓ Session successfully deleted:[/bold green] [bold cyan]{sess_id}[/bold cyan]")
                                 else:
                                     console.print(f"[bold red]Could not delete session:[/bold red] {sess_id}")
+                        else:
+                            success = SessionAdapters.delete_external_session(source, sess_id)
+                            if success:
+                                console.print(f"[bold green]✓ Session deleted:[/bold green] [{source.upper()}] {sess_id}")
+                            else:
+                                console.print(f"[bold red]Could not delete session:[/bold red] {sess_id}")
                         # Loop back to picker
                         continue
                 return True
@@ -1284,7 +1288,11 @@ async def async_main():
                             SessionManager.delete_session(target_id)
                             console.print(f"[bold green]✓ Session deleted:[/bold green] {target_id}")
                         else:
-                            console.print(f"[yellow]Deleting external session from '{target_source}' is not supported directly in cyc.[/yellow]")
+                            success = SessionAdapters.delete_external_session(target_source, target_id)
+                            if success:
+                                console.print(f"[bold green]✓ Session deleted:[/bold green] [{target_source.upper()}] {target_id}")
+                            else:
+                                console.print(f"[bold red]Could not delete session:[/bold red] {target_id}")
                         # Loop back to picker
                         continue
 
