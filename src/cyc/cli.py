@@ -1113,7 +1113,7 @@ def parse_args():
     parser.add_argument("--no-open", action="store_true", help="Do not automatically open the browser when starting Web interface")
     parser.add_argument("--bot", action="store_true", help="Launch the cyc Chatbot Gateway (e.g. Telegram)")
     parser.add_argument("--bot-token", type=str, default=None, help="Bot API token (overrides config)")
-    parser.add_argument("--update", action="store_true", help="Check for cyc updates and automatically install the latest version")
+    parser.add_argument("-u", "--update", action="store_true", help="Check for cyc updates and automatically install the latest version")
     return parser.parse_args()
 
 async def async_main():

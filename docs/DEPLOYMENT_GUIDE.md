@@ -26,12 +26,19 @@ uv tool install .
 cyc --version
 ```
 
-若欲更新至最新版程式碼：
+### 2.2 一鍵在線自我更新 (Self Updater)
+安裝後，隨時可在終端執行以下任一指令自動檢查 GitHub 最新版本並無縫安裝升級：
 ```bash
-uv tool install --force .
+# 檢查並自動升級最新版本
+cyc -u
+# 或
+cyc update
+
+# 強制重新安裝最新版
+cyc update --force
 ```
 
-### 2.2 透過 `pipx` 安裝
+### 2.3 透過 `pipx` 安裝
 ```bash
 pipx install .
 ```

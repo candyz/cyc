@@ -464,6 +464,13 @@ async def test_update_command_and_slash():
             await async_main()
             mock_update.assert_awaited_with(force=True)
 
+    # Test cli flag 'cyc -u'
+    with patch.object(sys, "argv", ["cyc", "-u"]):
+        with patch("cyc.updater.perform_update", new_callable=AsyncMock) as mock_update:
+            await async_main()
+            mock_update.assert_awaited_with(force=False)
+
+
 
 
 

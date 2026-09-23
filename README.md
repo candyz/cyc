@@ -94,7 +94,8 @@ cyc "請檢查專案中的單元測試覆蓋率"
 cat main.py | cyc "請為這段代碼編寫型別註解"
 
 # 5. 一鍵檢查更新並自動升級 (如同 pi update / agy update / claude update)
-cyc update                                                       # 檢查新版本並自動安裝升級
+cyc -u                                                           # 一鍵檢查新版本並自動安裝升級 (捷徑)
+cyc update                                                       # 同 cyc -u / cyc --update
 cyc update --force                                               # 強制重新安裝最新版
 ```
 
