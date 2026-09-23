@@ -7,13 +7,10 @@ from typing import Any, Dict, List, Optional
 
 import os
 
-def get_default_sessions_dir() -> Path:
-    env_dir = os.environ.get("CYC_SESSIONS_DIR")
-    if env_dir:
-        return Path(env_dir).expanduser().resolve()
-    return (Path.home() / ".local" / "share" / "cyc" / "sessions").resolve()
+DEFAULT_SESSIONS_DIR = Path(os.environ.get("CYC_SESSIONS_DIR") or (Path.home() / ".local" / "share" / "cyc" / "sessions")).expanduser().resolve()
 
-DEFAULT_SESSIONS_DIR = get_default_sessions_dir()
+def get_default_sessions_dir() -> Path:
+    return DEFAULT_SESSIONS_DIR
 
 def estimate_tokens(text: str) -> int:
     """Heuristic token estimation:

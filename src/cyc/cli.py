@@ -430,57 +430,62 @@ class CliApp:
                 return True
 
             elif sub_cmd in ("manage", "-i", "--interactive"):
-                # Collect all sessions for interactive management
-                sessions = []
-                sessions.extend(SessionManager.list_sessions(sessions_dir=self.session.sessions_dir))
-                sessions.extend(SessionAdapters.list_agy_sessions())
-                sessions.extend(SessionAdapters.list_claude_sessions())
-                sessions.extend(SessionAdapters.list_pi_sessions())
-                sessions.extend(SessionAdapters.list_opencode_sessions())
-                sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+                while True:
+                    # Collect all sessions for interactive management
+                    sessions = []
+                    sessions.extend(SessionManager.list_sessions(sessions_dir=self.session.sessions_dir))
+                    sessions.extend(SessionAdapters.list_agy_sessions())
+                    sessions.extend(SessionAdapters.list_claude_sessions())
+                    sessions.extend(SessionAdapters.list_pi_sessions())
+                    sessions.extend(SessionAdapters.list_opencode_sessions())
+                    sessions.sort(key=lambda s: s["updated_at"], reverse=True)
 
-                if not sessions:
-                    console.print("[yellow]No saved sessions found to manage.[/yellow]")
-                    return True
+                    if not sessions:
+                        console.print("[yellow]No saved sessions found to manage.[/yellow]")
+                        return True
 
-                action_result = await self.ui.interactive_session_picker(
-                    sessions,
-                    current_workspace=self.workspace_path,
-                    current_branch=getattr(self.session, "git_branch", None),
-                )
-                if not action_result:
-                    return True
+                    action_result = await self.ui.interactive_session_picker(
+                        sessions,
+                        current_workspace=self.workspace_path,
+                        current_branch=getattr(self.session, "git_branch", None),
+                    )
+                    if not action_result:
+                        return True
 
-                act = action_result.get("action")
-                sess_meta = action_result.get("session") or {}
-                sess_id = sess_meta.get("id") or sess_meta.get("session_id")
-                source = (sess_meta.get("agent") or sess_meta.get("source") or "cyc").lower()
+                    act = action_result.get("action")
+                    sess_meta = action_result.get("session") or {}
+                    sess_id = sess_meta.get("id") or sess_meta.get("session_id")
+                    source = (sess_meta.get("agent") or sess_meta.get("source") or "cyc").lower()
 
-                if act == "resume":
-                    # Delegate to /resume logic
-                    return await self.handle_slash_command(f"/resume {source} {sess_id}")
-                elif act == "rename":
-                    new_title = action_result.get("new_title") or action_result.get("title")
-                    if new_title and sess_id:
-                        if source != "cyc":
-                            console.print(f"[yellow]Renaming external session '{source}' is not supported yet.[/yellow]")
-                        else:
-                            target_sess = SessionManager.find_session(sess_id)
-                            if target_sess:
-                                target_sess.rename(new_title)
-                                console.print(f"[bold green]✓ Session {sess_id} renamed to:[/bold green] [bold cyan]{new_title}[/bold cyan]")
-                elif act == "delete":
-                    if source != "cyc":
-                        console.print(f"[yellow]Deleting external session from '{source}' is not supported directly in cyc.[/yellow]")
-                    else:
-                        if self.session.session_id == sess_id:
-                            console.print("[bold yellow]Cannot delete currently active session.[/bold yellow]")
-                        else:
-                            success = SessionManager.delete_session(sess_id)
-                            if success:
-                                console.print(f"[bold green]✓ Session successfully deleted:[/bold green] [bold cyan]{sess_id}[/bold cyan]")
+                    if act == "resume":
+                        # Delegate to /resume logic and exit picker loop
+                        return await self.handle_slash_command(f"/resume {source} {sess_id}")
+                    elif act == "rename":
+                        new_title = action_result.get("new_title") or action_result.get("title")
+                        if new_title and sess_id:
+                            if source != "cyc":
+                                console.print(f"[yellow]Renaming external session '{source}' is not supported yet.[/yellow]")
                             else:
-                                console.print(f"[bold red]Could not delete session:[/bold red] {sess_id}")
+                                target_sess = SessionManager.find_session(sess_id)
+                                if target_sess:
+                                    target_sess.rename(new_title)
+                                    console.print(f"[bold green]✓ Session {sess_id} renamed to:[/bold green] [bold cyan]{new_title}[/bold cyan]")
+                        # Loop back to picker
+                        continue
+                    elif act == "delete":
+                        if source != "cyc":
+                            console.print(f"[yellow]Deleting external session from '{source}' is not supported directly in cyc.[/yellow]")
+                        else:
+                            if self.session.session_id == sess_id:
+                                console.print("[bold yellow]Cannot delete currently active session.[/bold yellow]")
+                            else:
+                                success = SessionManager.delete_session(sess_id)
+                                if success:
+                                    console.print(f"[bold green]✓ Session successfully deleted:[/bold green] [bold cyan]{sess_id}[/bold cyan]")
+                                else:
+                                    console.print(f"[bold red]Could not delete session:[/bold red] {sess_id}")
+                        # Loop back to picker
+                        continue
                 return True
 
             # Standard listing
@@ -1217,12 +1222,28 @@ async def async_main():
                     pass
 
                 temp_ui = TerminalUI()
-                action_res = await temp_ui.interactive_session_picker(
-                    sessions,
-                    current_workspace=Path.cwd(),
-                    current_branch=curr_branch,
-                )
-                if action_res and action_res.get("action"):
+                while True:
+                    sessions = []
+                    sessions.extend(SessionManager.list_sessions())
+                    sessions.extend(SessionAdapters.list_agy_sessions())
+                    sessions.extend(SessionAdapters.list_claude_sessions())
+                    sessions.extend(SessionAdapters.list_pi_sessions())
+                    sessions.extend(SessionAdapters.list_opencode_sessions())
+                    sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+
+                    if not sessions:
+                        console.print("[yellow]No previous sessions found to resume. Starting new session.[/yellow]")
+                        break
+
+                    action_res = await temp_ui.interactive_session_picker(
+                        sessions,
+                        current_workspace=Path.cwd(),
+                        current_branch=curr_branch,
+                    )
+                    if not action_res or not action_res.get("action"):
+                        # User pressed Esc/Cancel in picker -> exit cyc
+                        return
+
                     act = action_res.get("action")
                     sess_meta = action_res.get("session") or {}
                     target_id = sess_meta.get("id") or sess_meta.get("session_id")
@@ -1243,6 +1264,8 @@ async def async_main():
                         elif target_source == "opencode":
                             clean_q = target_id[9:] if target_id.startswith("opencode_") else target_id
                             resumed_session = SessionAdapters.import_opencode_session(clean_q)
+                        break
+
                     elif act == "rename":
                         new_t = action_res.get("new_title") or action_res.get("title")
                         if new_t and target_id:
@@ -1250,20 +1273,20 @@ async def async_main():
                                 t_sess = SessionManager.find_session(target_id)
                                 if t_sess:
                                     t_sess.rename(new_t)
-                                    resumed_session = t_sess
+                                    console.print(f"[bold green]✓ Session {target_id} renamed to:[/bold green] [bold cyan]{new_t}[/bold cyan]")
                             else:
                                 console.print(f"[yellow]Renaming external session '{target_source}' is not supported yet.[/yellow]")
+                        # Loop back to picker
+                        continue
+
                     elif act == "delete":
                         if target_source == "cyc":
                             SessionManager.delete_session(target_id)
                             console.print(f"[bold green]✓ Session deleted:[/bold green] {target_id}")
-                            return
                         else:
                             console.print(f"[yellow]Deleting external session from '{target_source}' is not supported directly in cyc.[/yellow]")
-                            return
-                else:
-                    # User pressed Esc/Cancel in picker
-                    return
+                        # Loop back to picker
+                        continue
 
         elif args.resume == "LATEST":
             resumed_session = SessionManager.get_latest_session()

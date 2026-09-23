@@ -413,6 +413,32 @@ async def test_async_main_interactive_resume(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_async_main_interactive_delete_then_resume(tmp_path):
+    sess_dir = tmp_path / "sessions"
+    sess1 = SessionManager(session_id="to_delete_target", sessions_dir=sess_dir)
+    sess1.add_user_message("Session 1")
+    sess2 = SessionManager(session_id="to_resume_target", sessions_dir=sess_dir)
+    sess2.add_user_message("Session 2")
+
+    with patch.object(sys, "argv", ["cyc", "-r"]):
+        with patch.object(sys.stdin, "isatty", return_value=True):
+            with patch("cyc.ui.TerminalUI.interactive_session_picker", new_callable=AsyncMock) as mock_picker:
+                # First call: delete sess1; second call: resume sess2
+                mock_picker.side_effect = [
+                    {"action": "delete", "session": {"id": "to_delete_target", "agent": "cyc"}},
+                    {"action": "resume", "session": {"id": "to_resume_target", "agent": "cyc"}},
+                ]
+                with patch("cyc.cli.CliApp.repl", new_callable=AsyncMock) as mock_repl:
+                    with patch("cyc.session.DEFAULT_SESSIONS_DIR", sess_dir):
+                        await async_main()
+                        assert mock_picker.call_count == 2
+                        assert mock_repl.called
+                        # Verify sess1 was deleted and sess2 still exists
+                        assert SessionManager.find_session("to_delete_target", sessions_dir=sess_dir) is None
+                        assert SessionManager.find_session("to_resume_target", sessions_dir=sess_dir) is not None
+
+
+@pytest.mark.asyncio
 async def test_quick_chat_shortcuts():
     config = load_config(Path("/nonexistent"))
     app = CliApp(config, provider_name="ollama")
