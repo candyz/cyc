@@ -44,8 +44,10 @@ class CliApp:
         mode: str = "agent",
         permission_mode: PermissionMode = PermissionMode.INTERACTIVE,
         session: Optional[SessionManager] = None,
+        classic_mode: bool = False,
     ):
         self.config = config
+        self.classic_mode = classic_mode
         self.provider_name = provider_name or config.default_provider
         self.provider_config = config.get_provider(self.provider_name)
         self.model = model_name or self.provider_config.default_model or config.default_model
@@ -1031,13 +1033,21 @@ class CliApp:
                 sys.stdout.write(f"\033[{lines};1H\033[2K")
                 # Reset scrolling region to full screen
                 sys.stdout.write("\033[r")
-                # Move cursor to the bottom row and emit newline to push prompt_toolkit down safely
-                sys.stdout.write(f"\033[{lines};1H\n")
                 sys.stdout.flush()
             except Exception:
                 pass
 
-
+    def dock_cursor_to_bottom(self) -> None:
+        """Position cursor at lines-1 (second to last line) so prompt_toolkit renders
+        the prompt docked at lines-1 with bottom_toolbar anchored at lines.
+        """
+        if self.classic_mode or not sys.stdout.isatty():
+            return
+        term_size = shutil.get_terminal_size()
+        lines = term_size.lines
+        if lines >= 4:
+            sys.stdout.write(f"\033[{lines};1H\n\033[{lines-1};1H")
+            sys.stdout.flush()
 
     async def repl(self) -> None:
         self.ui.print_banner(self.provider_name, self.model, self.multiline_mode, mode=self.mode)
@@ -1058,6 +1068,7 @@ class CliApp:
             prompt_label = "... > " if self.multiline_mode else (f"[{self.mode}] you > " if self.mode != "agent" else "you > ")
 
             try:
+                self.dock_cursor_to_bottom()
                 user_input = await asyncio.to_thread(prompt_session.prompt, prompt_label)
                 user_input = user_input.strip()
                 if not user_input:
@@ -1126,6 +1137,7 @@ def parse_args():
     parser.add_argument("--bot", action="store_true", help="Launch the cyc Chatbot Gateway (e.g. Telegram)")
     parser.add_argument("--bot-token", type=str, default=None, help="Bot API token (overrides config)")
     parser.add_argument("-u", "--update", action="store_true", help="Check for cyc updates and automatically install the latest version")
+    parser.add_argument("--classic", action="store_true", help="Use classic scrolling prompt instead of docked bottom input")
     return parser.parse_args()
 
 async def async_main():
@@ -1431,6 +1443,7 @@ async def async_main():
         mode=mode,
         permission_mode=permission_mode,
         session=resumed_session,
+        classic_mode=args.classic,
     )
     if args.max_turns is not None and args.max_turns > 0:
         app.agent_loop.max_turns = args.max_turns

@@ -504,11 +504,40 @@ def test_completion_script_includes_u_flag():
     assert "--update" in bash_script
     assert "--max-turns" in bash_script
     assert "--bot" in bash_script
+    assert "--classic" in bash_script
 
     zsh_script = get_completion_script("zsh")
     assert "(-u --update)" in zsh_script
     assert "--max-turns" in zsh_script
     assert "--bot" in zsh_script
+    assert "--classic" in zsh_script
+
+
+def test_parse_args_classic_flag():
+    with patch.object(sys, "argv", ["cyc", "--classic"]):
+        args = parse_args()
+        assert args.classic is True
+
+
+def test_dock_cursor_to_bottom(capsys):
+    from unittest.mock import MagicMock
+    config = load_config(Path("/nonexistent"))
+
+    # 1. Classic mode -> should not output escape sequences
+    app_classic = CliApp(config, provider_name="ollama", classic_mode=True)
+    with patch.object(sys.stdout, "isatty", return_value=True):
+        app_classic.dock_cursor_to_bottom()
+    out = capsys.readouterr().out
+    assert "\033[" not in out
+
+    # 2. Docked mode in TTY -> should output cursor positioning escape sequence
+    app_docked = CliApp(config, provider_name="ollama", classic_mode=False)
+    with patch.object(sys.stdout, "isatty", return_value=True):
+        with patch("shutil.get_terminal_size", return_value=MagicMock(lines=24, columns=80)):
+            app_docked.dock_cursor_to_bottom()
+    out = capsys.readouterr().out
+    assert "\033[24;1H\n\033[23;1H" in out
+
 
 
 

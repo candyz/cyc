@@ -8,7 +8,7 @@ _cyc_completion() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent --chat -y --yes --read-only -r --resume --max-turns --sessions --trust --no-trust --completion --web --port --host --token --no-open --bot --bot-token -u --update init web update bot"
+    opts="-v --version -p --provider -m --model -s --system -c --config --init -f --force --agent --chat -y --yes --read-only -r --resume --max-turns --sessions --trust --no-trust --completion --web --port --host --token --no-open --bot --bot-token -u --update --classic init web update bot"
     providers="ollama openrouter omlx nvidia gemini agy opencode"
 
     case "${prev}" in
@@ -78,6 +78,7 @@ _cyc() {
         '--bot[Launch the cyc Chatbot Gateway (e.g. Telegram)]'
         '--bot-token[Bot API token (overrides config)]:bot token:'
         '(-u --update)'{-u,--update}'[Check for updates and automatically upgrade cyc]'
+        '--classic[Use classic scrolling prompt instead of docked bottom input]'
         '*:prompt:_files'
     )
     _arguments -s $opts
