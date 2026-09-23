@@ -900,7 +900,7 @@ class TerminalUI:
         # Live Markdown stream for remaining chunks
         has_think = "<think>" in full_text
         try:
-            with Live(Markdown(full_text), console=self.console, refresh_per_second=12, transient=True) as live:
+            with Live(Markdown(full_text), console=self.console, refresh_per_second=12, transient=False) as live:
                 # Update initial display if first chunk contained thinking
                 if "<think>" in full_text and "</think>" not in full_text:
                     has_think = True
@@ -923,12 +923,9 @@ class TerminalUI:
                         live.update(Markdown(full_text))
 
             # After live stream completes:
-            # If think tags were present, render the styled Thinking Process panel + clean markdown response.
-            # If standard response, print the full markdown.
+            # If think tags were present, clear transient display and render the styled Thinking Process panel + clean markdown.
             if has_think:
                 self.render_formatted_response(full_text)
-            else:
-                self.console.print(Markdown(full_text))
             self.console.print()
         except (asyncio.CancelledError, KeyboardInterrupt):
             self.console.print("\n[dim yellow](Interrupted by user)[/dim yellow]\n")

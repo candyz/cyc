@@ -1000,58 +1000,29 @@ class CliApp:
 
     @contextmanager
     def fixed_status_bar_scroll_region(self):
-        """Reserve bottom line for fixed status bar and scroll upper region (lines 1..H-1)."""
-        is_tty = sys.stdout.isatty() and hasattr(sys.stdout, "write")
-        term_size = shutil.get_terminal_size()
-        lines, cols = term_size.lines, term_size.columns
+        """Safe execution context for model response turns.
+        Status bar information is cleanly displayed via prompt_toolkit bottom_toolbar
+        to prevent hardware terminal scrolling escape sequences from wiping responses.
+        """
+        yield
 
-        if not is_tty or lines < 4:
-            yield
-            return
-
-        try:
-            from rich.text import Text
-
-            # 1. Restrict scroll region to top lines (1 to lines - 1)
-            sys.stdout.write(f"\033[1;{lines-1}r")
-
-            # 2. Render status line markup padded to full width
-            markup = " " + self._get_status_line_markup()
-            txt = Text.from_markup(markup)
-            if txt.cell_len < cols:
-                txt.pad_right(cols)
-            with console.capture() as cap:
-                console.print(txt, end="")
-            status_line = cap.get()
-
-            # 3. Draw status line on the last row and position cursor at line lines-1
-            sys.stdout.write(f"\033[{lines};1H{status_line}\033[{lines-1};1H\n")
-            sys.stdout.flush()
-
-            yield
-        finally:
-            try:
-                # Reposition cursor above status bar, reset scrolling region to full screen, and emit newline
-                sys.stdout.write(f"\033[{lines-1};1H\033[r\n")
-                sys.stdout.flush()
-            except Exception:
-                pass
 
     async def repl(self) -> None:
         self.ui.print_banner(self.provider_name, self.model, self.multiline_mode, mode=self.mode)
         # Prefetch model list for tab completion
         asyncio.create_task(self.update_cached_models())
 
-        while True:
-            prompt_session = create_prompt_session(
-                history_file=HISTORY_FILE,
-                get_models=self.get_known_models,
-                get_providers=self.get_known_providers,
-                get_sessions=self.get_known_sessions,
-                multiline=self.multiline_mode,
-                bottom_toolbar=self._get_status_toolbar,
-            )
+        prompt_session = create_prompt_session(
+            history_file=HISTORY_FILE,
+            get_models=self.get_known_models,
+            get_providers=self.get_known_providers,
+            get_sessions=self.get_known_sessions,
+            multiline=self.multiline_mode,
+            bottom_toolbar=self._get_status_toolbar,
+        )
 
+        while True:
+            prompt_session.multiline = self.multiline_mode
             prompt_label = "... > " if self.multiline_mode else (f"[{self.mode}] you > " if self.mode != "agent" else "you > ")
 
             try:
