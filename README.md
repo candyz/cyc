@@ -12,6 +12,9 @@
   - **預設 Agent 模式**：開箱即具備自我驅動能力，支援閱讀專案、編輯代碼、執行測試與診斷除錯。
   - **純問答免工具快顯捷徑**：輸入以 `?` 開頭（如 `? list 與 tuple 差異`）或 `/chat <prompt>`，即可直接進行極速單輪問答，完全跳過 Agent 工具載入與推論輪次，省時省 Token。
   - **核心工具集**：內建 `read_file`, `write_file`, `replace_file_content`（精準置換＋紅綠 Unified Diff 審批）、`run_command`, `list_dir`, `grep_search`。
+  - **互動澄清與決策工具 (`ask_user`)**：Agent 在需求模糊或架構選型時可主動發起單選/多選/自由輸入澄清問答，終端互動選單渲染，避免臆測需求。
+  - **代碼庫拓撲地圖 (`repo_map`)**：基於 AST 與通用符號分析，自動抽取專案中 classes、functions、methods 結構地圖，精準掌握工程拓撲。
+  - **多層級專案規則體系 (Project Rules)**：自動探索與合併全域規則（`~/.config/cyc/rules/*.md`）與專案規則（`CYC.md`, `AGENTS.md`, `CLAUDE.md`, `.cursorrules` 等），支援防爆預算截斷。
   - **PTC 程式化工具呼叫 (Programmatic Tool-Calling)**：透過 `run_script` 支援以單一 Turn 執行 Python / Bash 多步驟管線運算，顯著節省多輪 API 呼叫。
   - **可插拔 Loop 決策策略 (`/loop`)**：支援動態切換 `standard` (多回合 ReAct)、`plan` (先規劃後執行)、`minimal` (3 輪評測/快跑)，預設 100 turns。
   - **原生聯網與網頁擷取**：內建 `web_search`（整合 SearXNG 隱私搜尋）與 `fetch_url`（智慧抽取網頁乾淨 Markdown 內文並自動截斷防爆）。

@@ -15,7 +15,7 @@ def test_build_coding_agent_system_prompt_with_cyc_md(tmp_path: Path, monkeypatc
     cyc_md.write_text("Always use TypeScript and adhere to ESLint rules.", encoding="utf-8")
 
     prompt = build_coding_agent_system_prompt()
-    assert "Project Guidelines (CYC.md):" in prompt
+    assert "Project Guideline: CYC.md" in prompt
     assert "Always use TypeScript and adhere to ESLint rules." in prompt
 
 def test_build_coding_agent_system_prompt_with_agents_md(tmp_path: Path, monkeypatch):
@@ -24,7 +24,7 @@ def test_build_coding_agent_system_prompt_with_agents_md(tmp_path: Path, monkeyp
     agents_md.write_text("Follow Clean Architecture guidelines.", encoding="utf-8")
 
     prompt = build_coding_agent_system_prompt()
-    assert "Project Guidelines (AGENTS.md):" in prompt
+    assert "Project Guideline: AGENTS.md" in prompt
     assert "Follow Clean Architecture guidelines." in prompt
 
 def test_generate_unified_diff():

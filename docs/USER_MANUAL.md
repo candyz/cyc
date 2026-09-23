@@ -109,7 +109,22 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 | `grep_search` | 唯讀 | 在專案內使用正則表達式快速檢索文字與程式碼符號 |
 | `web_search` | 唯讀 | **聯網搜尋**：連接 SearXNG 實例進行隱私且即時的網路資訊檢索 |
 | `fetch_url` | 唯讀 | **網頁擷取**：抓取 URL 網頁內容，智慧提取乾淨文字/Markdown 並自動截斷防爆 |
+| `ask_user` | 互動 | **互動澄清**：主動向使用者發起單選/多選/自由輸入問答，釐清模糊需求與架構決策 |
+| `repo_map` | 唯讀 | **代碼地圖**：基於 AST 與通用符號分析，輸出 classes, functions 緊湊拓撲樹 |
 | `MCP Tools` | 擴充 | 透過 Model Context Protocol 動態掛載之外部工具 |
+
+### 3.1 互動澄清工具 (`ask_user`)
+當使用者需求包含多種實作路徑、技術選型或需求模糊不清時，Agent 可主動調用 `ask_user` 工具，向使用者拋出結構化選項或開放性問題。在終端 CLI 中，使用者可以直接以數字選單或鍵盤文字互動回應，徹底避免 Agent 擅自臆測需求。在無 TTY 或非互動式環境中，工具具備安全的 Fallback 機制自動回傳預設首選方案。
+
+### 3.2 代碼庫拓撲地圖 (`repo_map`)
+透過原生 Python `ast` 模組以及通用 Regex 多語言符號解析器，`repo_map` 工具能在毫秒級內遍歷專案目錄，擷取 Python、JavaScript/TypeScript、Go、Rust 等主流語言的 Class、Function、Method、Interface 等核心定義符號，並以帶縮排與檔名的樹狀結構呈現。此地圖不僅能在 Agent 啟動時作為拓撲感知依據，亦可由 Agent 在探索複雜程式碼庫時按需呼叫。
+
+### 3.3 專案與全域規則體系 (Project Rules & System Prompts)
+`cyc` 具備多層級規則自動探索與合併機制（`RuleManager`）：
+- **全域規則**：置放於 `~/.config/cyc/rules/*.md`，適用於本機所有專案之通用編程標準與安全守則。
+- **專案規則**：優先識別工作區根目錄下的 `CYC.md`、`AGENTS.md`、`.gemini/GEMINI.md`、`.gemini/AGENTS.md`、`GEMINI.md`、`CLAUDE.md`、`.cursorrules` 等常見規範檔案。
+- **智慧合併與截斷保護**：所有規則檔案自動結構化標註來源並合併注入系統提示詞，同時具備單檔與總量 Token 預算截斷防爆機制，確保系統提示詞維持精準輕量。
+
 
 ---
 

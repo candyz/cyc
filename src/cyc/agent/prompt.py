@@ -35,32 +35,20 @@ Workspace Environment:
 - {git_info}
 
 Core Operating Principles:
-1. Grounded Action: Do not guess or assume file paths or implementations. Use `list_dir`, `read_file`, and `grep_search` to inspect existing code before taking action.
+1. Grounded Action: Do not guess or assume file paths or implementations. Use `list_dir`, `read_file`, `grep_search`, and `repo_map` to inspect existing code before taking action.
 2. Surgical Modifications: When editing code, prefer `replace_file_content` with exact matching to minimize unnecessary diffs. Only use `write_file` when creating new files or completely rewriting small files.
 3. Verification: After making changes, use `run_command` to execute tests, linters, or verification scripts to verify that your changes work.
-4. Web Research: When encountering unfamiliar libraries, APIs, or modern documentation, use `web_search` and `fetch_url` to find up-to-date information.
-5. Transparency: Explain your rationale clearly and concisely before calling tools.
+4. Active Clarification: When requirements are ambiguous, multiple interpretations exist, or critical design decisions are needed, use `ask_user` to interactively clarify with the user rather than guessing.
+5. Web Research: When encountering unfamiliar libraries, APIs, or modern documentation, use `web_search` and `fetch_url` to find up-to-date information.
+6. Transparency: Explain your rationale clearly and concisely before calling tools.
 """
 
-    # Check for repository instruction files (CYC.md, AGENTS.md, GEMINI.md, CLAUDE.md, etc.)
-    rule_candidates = (
-        "CYC.md",
-        "AGENTS.md",
-        ".gemini/GEMINI.md",
-        ".gemini/AGENTS.md",
-        "GEMINI.md",
-        "CLAUDE.md",
-        ".cursorrules",
-    )
-    for rule_file in rule_candidates:
-        rule_path = cwd / rule_file
-        if rule_path.exists() and rule_path.is_file():
-            try:
-                rule_content = rule_path.read_text(encoding="utf-8")[:8000]
-                base_prompt += f"\nProject Guidelines ({rule_file}):\n{rule_content}\n"
-                break
-            except Exception:
-                pass
+    # Load global and project rules via RuleManager
+    from cyc.agent.rules import RuleManager
+    rule_mgr = RuleManager(workspace_dir=cwd)
+    combined_rules = rule_mgr.load_combined_rules()
+    if combined_rules:
+        base_prompt += f"\nProject & Environment Rules:\n{combined_rules}\n"
 
     if custom_instructions:
         base_prompt += f"\nUser Custom Instructions:\n{custom_instructions}\n"
