@@ -377,7 +377,7 @@ class CliApp:
   /save <filepath>            Save current conversation to Markdown (.md) or JSON (.json)
   /load <filepath>            Load previous conversation from a JSON file
   /undo                       Undo last turn's changes and conversation
-  /update [force]             Check for new versions and auto-update cyc
+  /update                     Check for new versions and auto-update cyc
   /clear                      Clear current session history
   /exit or /quit              Exit CLI""")
             return True
