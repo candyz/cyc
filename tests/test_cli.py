@@ -125,7 +125,6 @@ def test_status_toolbar():
 
     app.mode = "agent"
     toolbar_html_agent = app._get_status_toolbar()
-    assert "AGENT" in toolbar_html_agent.value
     assert app.workspace_path.name in toolbar_html_agent.value
 
 

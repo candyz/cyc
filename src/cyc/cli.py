@@ -942,8 +942,6 @@ class CliApp:
 
     def _get_status_toolbar(self) -> HTML:
         """Generate status bar displayed at the bottom of the prompt."""
-        mode_badge = f"<b><style bg='ansimagenta' fg='ansiwhite'> AGENT </style></b>" if self.mode == "agent" else f"<b><style bg='ansicyan' fg='ansiwhite'> CHAT </style></b>"
-
         if self.is_workspace_trusted is False:
             trust_badge = "<style bg='ansired' fg='ansiwhite'><b> UNTRUSTED (READ-ONLY) </b></style>"
         elif self.is_workspace_trusted is True:
@@ -957,8 +955,7 @@ class CliApp:
         project_name = self.workspace_path.name or str(self.workspace_path)
 
         status_text = (
-            f" {mode_badge} "
-            f"<b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
+            f" <b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
             f"<style fg='ansibrightyellow'>{project_name}</style> | "
             f"<style fg='ansigreen'>{self.provider_name}</style> | "
             f"<style fg='ansicyan'>{self.model}</style> | "
@@ -967,8 +964,6 @@ class CliApp:
         return HTML(status_text)
 
     def _get_status_line_markup(self) -> str:
-        mode_badge = "[bold white on magenta] AGENT [/bold white on magenta]" if self.mode == "agent" else "[bold white on cyan] CHAT [/bold white on cyan]"
-
         if self.is_workspace_trusted is False:
             trust_badge = "[bold white on red] UNTRUSTED (READ-ONLY) [/bold white on red]"
         elif self.is_workspace_trusted is True:
@@ -982,7 +977,6 @@ class CliApp:
         project_name = self.workspace_path.name or str(self.workspace_path)
 
         return (
-            f"{mode_badge} "
             f"[bold]Context:[/bold] [yellow]{token_str}[/yellow] | "
             f"[bright_yellow]{project_name}[/bright_yellow] | "
             f"[green]{self.provider_name}[/green] | "
