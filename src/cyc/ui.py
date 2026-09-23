@@ -990,6 +990,10 @@ def create_prompt_session(
     def _(event):
         event.current_buffer.insert_text("\n")
 
+    toolbar_style = Style.from_dict({
+        "bottom-toolbar": "noreverse",
+    })
+
     session = PromptSession(
         history=history,
         completer=completer,
@@ -997,6 +1001,7 @@ def create_prompt_session(
         key_bindings=kb,
         multiline=multiline,
         bottom_toolbar=bottom_toolbar,
+        style=toolbar_style,
     )
 
     if docked:
