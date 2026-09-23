@@ -943,11 +943,11 @@ class CliApp:
     def _get_status_toolbar(self) -> HTML:
         """Generate status bar displayed at the bottom of the prompt."""
         if self.is_workspace_trusted is False:
-            trust_badge = "<style bg='ansired' fg='ansiwhite'><b> UNTRUSTED (READ-ONLY) </b></style>"
-        elif self.is_workspace_trusted is True:
-            trust_badge = "<style fg='ansigreen'>[Trusted]</style>"
+            trust_badge = " | <style bg='ansired' fg='ansiwhite'><b> UNTRUSTED (READ-ONLY) </b></style>"
+        elif self.is_workspace_trusted is None:
+            trust_badge = " | <style fg='ansiyellow'>[Untrusted]</style>"
         else:
-            trust_badge = "<style fg='ansiyellow'>[Untrusted]</style>"
+            trust_badge = ""
 
         tokens = self.session.total_estimated_tokens()
         limit = self.session.max_context_tokens
@@ -955,21 +955,21 @@ class CliApp:
         project_name = self.workspace_path.name or str(self.workspace_path)
 
         status_text = (
-            f" <b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
-            f"<style fg='ansibrightyellow'>{project_name}</style> | "
+            f" <style fg='ansibrightyellow'>{project_name}</style> | "
+            f"<b>Context:</b> <style fg='ansiyellow'>{token_str}</style> | "
             f"<style fg='ansigreen'>{self.provider_name}</style> | "
-            f"<style fg='ansicyan'>{self.model}</style> | "
+            f"<style fg='ansicyan'>{self.model}</style>"
             f"{trust_badge} "
         )
         return HTML(status_text)
 
     def _get_status_line_markup(self) -> str:
         if self.is_workspace_trusted is False:
-            trust_badge = "[bold white on red] UNTRUSTED (READ-ONLY) [/bold white on red]"
-        elif self.is_workspace_trusted is True:
-            trust_badge = "[green][Trusted][/green]"
+            trust_badge = " | [bold white on red] UNTRUSTED (READ-ONLY) [/bold white on red]"
+        elif self.is_workspace_trusted is None:
+            trust_badge = " | [yellow][Untrusted][/yellow]"
         else:
-            trust_badge = "[yellow][Untrusted][/yellow]"
+            trust_badge = ""
 
         tokens = self.session.total_estimated_tokens()
         limit = self.session.max_context_tokens
@@ -977,10 +977,10 @@ class CliApp:
         project_name = self.workspace_path.name or str(self.workspace_path)
 
         return (
-            f"[bold]Context:[/bold] [yellow]{token_str}[/yellow] | "
             f"[bright_yellow]{project_name}[/bright_yellow] | "
+            f"[bold]Context:[/bold] [yellow]{token_str}[/yellow] | "
             f"[green]{self.provider_name}[/green] | "
-            f"[cyan]{self.model}[/cyan] | "
+            f"[cyan]{self.model}[/cyan]"
             f"{trust_badge}"
         )
 

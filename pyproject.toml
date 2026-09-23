@@ -1,6 +1,6 @@
 [project]
 name = "cyc"
-version = "1.7.4"
+version = "1.7.5"
 description = "CLI chat and autonomous coding agent for local and cloud LLMs"
 readme = "README.md"
 requires-python = ">=3.10"
