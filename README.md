@@ -46,7 +46,7 @@
   - 在 REPL 中隨時輸入 `!<command>`（如 `!git status`、`!ls -la`）即可直接執行本地終端指令。
 
 - 🌐 **多元使用形態：CLI + Web 介面 + Telegram 機器人**：
-  - **終端 CLI**：富文本 Markdown 串流渲染、狀態列顯示、多行編輯切換 (`/multiline`)、Tab 智慧自動補全。
+  - **終端 CLI (Docked Bottom TUI)**：現代主流固定底座介面（提示字元永遠錨定於倒數第二行，最底行固定置底 Statusline，上方為獨立滾動輸出視窗）、支援 `--classic` 切換傳統隨動模式、富文本 Markdown 串流渲染、多行編輯切換 (`/multiline`)、Tab 智慧自動補全。
   - **Web 介面 (`cyc --web`)**：現代化三欄 SPA、Monaco 雙欄 Diff 比對審批、xterm.js 嵌入式終端、WebSocket/SSE 雙通道、Token 儀表板。
   - **Telegram 常駐 Bot (`cyc --bot`)**：白名單身分驗證、Inline Keyboard HITL 審批卡片、超長 Patch 檔案附件發送、全天候行動端遠端控制。
 
@@ -105,6 +105,9 @@ cat main.py | cyc "請為這段代碼編寫型別註解"
 cyc -u                                                           # 一鍵檢查新版本並自動安裝升級 (捷徑)
 cyc update                                                       # 同 cyc -u / cyc --update
 cyc update --force                                               # 強制重新安裝最新版
+
+# 6. 使用傳統隨動滾動輸入介面 (切換至 Classic 模式)
+cyc --classic
 ```
 
 ---

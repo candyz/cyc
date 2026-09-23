@@ -13,9 +13,19 @@
 # 產生預設設定檔 (~/.config/cyc/config.yaml)
 cyc init
 
-# 啟動互動式終端介面 (預設為對話模式，連線本地 Ollama)
+# 啟動互動式終端介面 (預設為 Agent 模式，採用現代固定底座 TUI)
 cyc
+
+# 啟動傳統隨動滾動輸入介面 (Classic 模式)
+cyc --classic
 ```
+
+> **固定底座介面 (Docked Bottom TUI)**：
+> `cyc` 預設採用現代主流 Coding Agent（如 Claude Code / OpenCode）的固定底座佈局：
+> - **輸入提示框**：永遠釘死於終端倒數第二行（支援多行貼上與 `Alt+Enter` 自動向上展開）。
+> - **置底狀態列 (Statusline)**：位於終端最底行，左側即時呈現目前專案名稱、Context 視窗使用量 (`Context: <current>/<limit>`)、提供者與模型（工作區受限時顯示 Untrusted 警示）。
+> - **上方獨立滾動視窗**：對話歷史、Agent 思考鏈、工具呼叫面板與 Markdown 串流皆在上方自然滾動，完美保留終端原生滑鼠滾輪選取與複製功能。
+> - 若偏好標準終端隨動提示符，可隨時加上 `--classic` 旗標啟動。
 
 ### 1.2 指定提供者 (Provider) 與模型 (Model)
 
