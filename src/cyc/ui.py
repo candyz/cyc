@@ -35,6 +35,38 @@ custom_theme = Theme({
 
 console = Console(theme=custom_theme)
 
+def fit_width(text: str, target_width: int) -> str:
+    """Pad or truncate string so that its terminal display width equals target_width (supports CJK wide chars)."""
+    try:
+        import wcwidth
+        def char_w(c: str) -> int:
+            w = wcwidth.wcwidth(c)
+            return w if w > 0 else 0
+    except ImportError:
+        def char_w(c: str) -> int:
+            return 1
+
+    total_w = sum(char_w(c) for c in text)
+    if total_w == target_width:
+        return text
+    elif total_w < target_width:
+        return text + " " * (target_width - total_w)
+    else:
+        res = []
+        cur_w = 0
+        limit = max(0, target_width - 3)
+        for c in text:
+            cw = char_w(c)
+            if cur_w + cw > limit:
+                break
+            res.append(c)
+            cur_w += cw
+        truncated = "".join(res) + "..."
+        cur_w += 3
+        if cur_w < target_width:
+            truncated += " " * (target_width - cur_w)
+        return truncated
+
 class CommandCompleter(Completer):
     """Dynamic completer for slash commands, models, providers, and filepaths."""
     def __init__(
@@ -554,28 +586,28 @@ class TerminalUI:
 
                 agent = (s.get("agent") or "cyc").upper()
                 sid = s.get("id") or s.get("session_id") or ""
-                title = s.get("title") or s.get("preview") or sid
-                if len(title) > 36:
-                    title = title[:33] + "..."
+                raw_title = s.get("title") or s.get("preview") or sid
+                title_aligned = fit_width(raw_title, 36)
                 msgs = s.get("message_count", 0)
                 branch = s.get("git_branch") or ""
                 branch_tag = f" ⎇ {branch}" if branch else ""
+                branch_aligned = fit_width(branch_tag, 12)
 
                 mtime_raw = s.get("updated_at")
                 if mtime_raw:
                     import datetime
                     mtime_str = datetime.datetime.fromtimestamp(mtime_raw).strftime("%Y-%m-%d %H:%M")
                 else:
-                    mtime_str = "-"
+                    mtime_str = "    -           "
 
                 prefix = " ► " if is_sel else "   "
                 item_class = "class:selected" if is_sel else "class:item"
                 agent_class = f"class:agent-{agent.lower()}" if not is_sel else "class:selected"
 
                 tokens.append((item_class, prefix))
-                tokens.append((agent_class, f"[{agent:<7}] "))
-                tokens.append((item_class, f"{title:<38} "))
-                tokens.append(("class:meta", f"({msgs:>2} msgs) {mtime_str} {branch_tag} - {sid[:18]}\n"))
+                tokens.append((agent_class, f"[{agent:<8}] "))
+                tokens.append((item_class, f"{title_aligned} "))
+                tokens.append(("class:meta", f"({msgs:>3} msgs) {mtime_str} {branch_aligned} - {sid[:18]}\n"))
 
             scroll_info = f" Showing {start+1}-{end} of {len(filtered)} sessions "
             tokens.append(("class:footer", f"\n{scroll_info:^80}\n"))
