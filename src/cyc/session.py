@@ -5,7 +5,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DEFAULT_SESSIONS_DIR = Path.home() / ".local" / "share" / "cyc" / "sessions"
+import os
+
+def get_default_sessions_dir() -> Path:
+    env_dir = os.environ.get("CYC_SESSIONS_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser().resolve()
+    return (Path.home() / ".local" / "share" / "cyc" / "sessions").resolve()
+
+DEFAULT_SESSIONS_DIR = get_default_sessions_dir()
 
 def estimate_tokens(text: str) -> int:
     """Heuristic token estimation:
@@ -71,7 +79,7 @@ class SessionManager:
         else:
             self.max_context_tokens = get_default_context_limit(provider, model)
         self.session_id = session_id or f"session_{int(time.time())}"
-        self.sessions_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        self.sessions_dir = sessions_dir or get_default_sessions_dir()
         self.workspace = workspace
         self.git_branch = git_branch
         self.messages: List[Dict] = []
@@ -94,8 +102,10 @@ class SessionManager:
             "timestamp": time.time(),
             "data": data,
         })
-        # Save append-only jsonl log
+        # Save append-only jsonl log only if session has messages or custom title
         try:
+            if not self.messages and not self.is_custom_title:
+                return
             log_file = self.sessions_dir / f"{self.session_id}.events.jsonl"
             log_file.parent.mkdir(parents=True, exist_ok=True)
             with open(log_file, "a", encoding="utf-8") as f:
@@ -411,9 +421,12 @@ class SessionManager:
             json.dump(self.to_dict(), f, ensure_ascii=False, indent=2)
 
     def auto_save(self) -> None:
-        """Automatically persist active session to sessions_dir."""
+        """Automatically persist active session to sessions_dir.
+        Only saves to disk if the session has meaningful messages or a custom title,
+        preventing empty sessions with only system prompts from cluttering the session list.
+        """
         try:
-            if not self.messages and not self.system_prompt and not self.title:
+            if not self.messages and not self.is_custom_title:
                 return
             target_file = self.sessions_dir / f"{self.session_id}.json"
             self.save_json(target_file)
@@ -443,7 +456,7 @@ class SessionManager:
     @classmethod
     def list_sessions(cls, sessions_dir: Optional[Path] = None) -> List[Dict]:
         """List all saved sessions sorted by most recent first."""
-        target_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        target_dir = sessions_dir or get_default_sessions_dir()
         if not target_dir.exists():
             return []
 
@@ -513,7 +526,7 @@ class SessionManager:
         if query == "LATEST":
             return cls.get_latest_session(sessions_dir=sessions_dir)
 
-        target_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        target_dir = sessions_dir or get_default_sessions_dir()
         # Direct filename or path
         direct_path = Path(query).expanduser()
         if direct_path.exists():
@@ -547,7 +560,7 @@ class SessionManager:
     @classmethod
     def delete_session(cls, query: str, sessions_dir: Optional[Path] = None) -> bool:
         """Delete a saved session by ID, exact title, or path. Return True if deleted."""
-        target_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        target_dir = sessions_dir or get_default_sessions_dir()
         sess = cls.find_session(query, sessions_dir=sessions_dir)
         if sess:
             target_file = target_dir / f"{sess.session_id}.json"
@@ -576,7 +589,7 @@ class SessionManager:
         """Prune empty or near-empty sessions with message count <= max_messages and no custom title.
         Returns the number of pruned session files.
         """
-        target_dir = sessions_dir or DEFAULT_SESSIONS_DIR
+        target_dir = sessions_dir or get_default_sessions_dir()
         pruned_count = 0
         sessions = cls.list_sessions(sessions_dir=sessions_dir)
         for s in sessions:

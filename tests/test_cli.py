@@ -147,6 +147,7 @@ async def test_sessions_and_resume_slash_commands(tmp_path: Path):
     s1.add_assistant_message("Test answer")
 
     app = CliApp(config, provider_name="ollama")
+    app.session.sessions_dir = sessions_dir
 
     with patch("cyc.session.DEFAULT_SESSIONS_DIR", sessions_dir):
         # /sessions

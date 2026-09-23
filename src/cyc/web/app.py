@@ -244,9 +244,8 @@ def create_app(config: Optional[Config] = None, auth_token: Optional[str] = None
 
     @app.delete("/api/sessions/{session_id}")
     async def delete_session(session_id: str):
-        target_file = Path.home() / ".local" / "share" / "cyc" / "sessions" / f"{session_id}.json"
-        if target_file.exists():
-            target_file.unlink()
+        success = SessionManager.delete_session(session_id)
+        if success:
             return {"status": "deleted", "session_id": session_id}
         raise HTTPException(status_code=404, detail="Session file not found")
 

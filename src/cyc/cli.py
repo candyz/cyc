@@ -487,7 +487,7 @@ class CliApp:
             filter_source = arg.lower() if arg else "all"
             sessions = []
             if filter_source in ("all", "cyc"):
-                sessions.extend(SessionManager.list_sessions())
+                sessions.extend(SessionManager.list_sessions(sessions_dir=self.session.sessions_dir))
             if filter_source in ("all", "agy"):
                 sessions.extend(SessionAdapters.list_agy_sessions())
             if filter_source in ("all", "claude"):
@@ -532,7 +532,7 @@ class CliApp:
                     target_query = parts[1].strip()
 
                     if target_agent == "cyc":
-                        loaded_session = SessionManager.find_session(target_query)
+                        loaded_session = SessionManager.find_session(target_query, sessions_dir=self.session.sessions_dir)
                     elif target_agent == "agy":
                         clean_query = target_query[4:] if target_query.startswith("agy_") else target_query
                         loaded_session = SessionAdapters.import_agy_session(clean_query)
@@ -553,7 +553,7 @@ class CliApp:
                     # User specified just the agent name e.g. "/resume agy" -> resume latest from that agent
                     target_agent = parts[0].lower()
                     if target_agent == "cyc":
-                        loaded_session = SessionManager.get_latest_session()
+                        loaded_session = SessionManager.get_latest_session(sessions_dir=self.session.sessions_dir)
                     elif target_agent == "agy":
                         agy_list = SessionAdapters.list_agy_sessions()
                         if agy_list:
@@ -577,7 +577,7 @@ class CliApp:
                 else:
                     target_query = arg
                     # Default: Check cyc sessions first
-                    loaded_session = SessionManager.find_session(target_query)
+                    loaded_session = SessionManager.find_session(target_query, sessions_dir=self.session.sessions_dir)
 
                     # Check agy if starts with agy_ or matches agy UUID
                     if not loaded_session:
