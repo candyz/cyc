@@ -1107,11 +1107,12 @@ class CliApp:
             get_sessions=self.get_known_sessions,
             multiline=self.multiline_mode,
             bottom_toolbar=self._get_status_toolbar,
+            docked=not self.classic_mode,
         )
 
         while True:
             prompt_session.multiline = self.multiline_mode
-            prompt_label = "... > " if self.multiline_mode else (f"[{self.mode}] you > " if self.mode != "agent" else "you > ")
+            prompt_label = "... > " if self.multiline_mode else (f"chat> " if self.mode == "chat" else (f"{self.mode}> " if self.mode != "agent" else "> "))
 
             try:
                 self.dock_cursor_to_bottom()

@@ -153,3 +153,19 @@ def test_terminal_ui_render_resumed_history():
     ui.render_resumed_history(many_messages, max_messages=5)
 
 
+def test_create_prompt_session_docked():
+    from cyc.ui import create_prompt_session
+    from prompt_toolkit.layout.containers import HSplit
+
+    # 1. Non-docked (standard PromptSession layout has default toolbars and controls)
+    session_classic = create_prompt_session(docked=False)
+    assert len(session_classic.app.layout.container.children) > 2
+
+    # 2. Docked (wrapped with [top_filler, inner_container])
+    session_docked = create_prompt_session(docked=True)
+    assert isinstance(session_docked.app.layout.container, HSplit)
+    # The top container of HSplit should have exactly 2 children: top filler and original container
+    assert len(session_docked.app.layout.container.children) == 2
+
+
+

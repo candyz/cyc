@@ -68,7 +68,7 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 `cyc` 採用 **Agent-First** 設計架構，預設進入自主編程代理模式，同時支援極速問答語法糖：
 
 ### 2.1 🤖 自主編程代理模式 (Coding Agent Mode - 預設)
-- **開箱即用**：預設提示字元為 `you > `，具備自主決策循環（ReAct Agent Loop），模型能主動調用工具讀寫檔案、檢索專案及執行命令。
+- **開箱即用**：預設提示字元為 `> `，具備自主決策循環（ReAct Agent Loop），模型能主動調用工具讀寫檔案、檢索專案及執行命令。
 - 啟動與控制方式：
   ```bash
   # 預設直接啟動 Agent 模式
@@ -97,7 +97,7 @@ git diff | cyc "請為這份 diff 撰寫 Conventional Commit 訊息"
 - **`/chat` 指令捷徑**：輸入 `/chat <query>`（例如 `/chat 寫一個正則表達式驗證 Email`），同樣直接執行高速純文字問答。
 
 ### 2.3 💬 純交談模式 (Chat Mode)
-- 當透過 `/mode chat` 或命令列 `--chat` 進入純聊天模式時，提示字元將顯示為 `[chat] you > `。
+- 當透過 `/mode chat` 或命令列 `--chat` 進入純聊天模式時，提示字元將顯示為 `chat> `。
 - 專注於傳統即時串流問答、概念諮詢與文字編輯，整場會話皆不使用 Agent 工具。
 - 結合 `rich.live` 即時排版 Markdown、表格與語法高亮，並支援 `<think>` 思考鏈折疊渲染。
 - 隨時可輸入 `/mode agent` 切換回自主代理模式。

@@ -9,10 +9,13 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion, PathCompleter
 from prompt_toolkit.document import Document
+from prompt_toolkit.filters import is_done
 from prompt_toolkit.formatted_text import HTML, AnyFormattedText, to_formatted_text
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout import Layout, HSplit, VSplit, Window
+from prompt_toolkit.layout.containers import ConditionalContainer
+from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Box, Frame, Label
@@ -958,8 +961,13 @@ def create_prompt_session(
     get_sessions: Optional[Callable[[], List[str]]] = None,
     multiline: bool = False,
     bottom_toolbar: Optional[Callable[[], AnyFormattedText]] = None,
+    docked: bool = False,
 ) -> PromptSession:
-    """Create a configured prompt_toolkit PromptSession with history and keybindings."""
+    """Create a configured prompt_toolkit PromptSession with history and keybindings.
+    When docked is True, wraps the layout with a dynamic top filler that occupies all
+    upper terminal rows so the input line is pinned at lines-1 (second to last row)
+    with the bottom toolbar pinned at lines (the very bottom row).
+    """
     if history_file:
         history_file.parent.mkdir(parents=True, exist_ok=True)
         history = FileHistory(str(history_file))
@@ -982,7 +990,7 @@ def create_prompt_session(
     def _(event):
         event.current_buffer.insert_text("\n")
 
-    return PromptSession(
+    session = PromptSession(
         history=history,
         completer=completer,
         auto_suggest=AutoSuggestFromHistory(),
@@ -990,3 +998,22 @@ def create_prompt_session(
         multiline=multiline,
         bottom_toolbar=bottom_toolbar,
     )
+
+    if docked:
+        import shutil
+
+        old_layout = session.app.layout
+
+        def get_top_filler_height():
+            lines = shutil.get_terminal_size().lines
+            # Reserve space for prompt (1 line) and bottom toolbar (1 line)
+            return Dimension(min=0, preferred=max(0, lines - 2), weight=1)
+
+        top_filler = ConditionalContainer(
+            Window(height=get_top_filler_height, dont_extend_height=False),
+            filter=~is_done,
+        )
+        new_root = HSplit([top_filler, old_layout.container])
+        session.app.layout = Layout(new_root, old_layout.current_window)
+
+    return session
